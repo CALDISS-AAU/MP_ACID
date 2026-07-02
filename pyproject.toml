@@ -1,0 +1,12 @@
+[project]
+name = "MP_ACID"
+version = "0.1.0"
+description = "This is a dummy project setup using uv. Use as reference for other CALDISS projects"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+create-pipeline = "Shared_Functions.pipeline_generator:main"
+
+[tool.setuptools]
+packages = ["Shared_Functions"]

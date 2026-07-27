@@ -1,12 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "MP_ACID"
 version = "0.1.0"
-description = "This is a dummy project setup using uv. Use as reference for other CALDISS projects"
 requires-python = ">=3.12"
 dependencies = []
 
 [project.scripts]
-create-pipeline = "Shared_Functions.pipeline_generator:main"
+create-pipeline = "Shared_Functions.Pipeline_Functions.pipeline_generator:main"
+clear-pipeline = "Shared_Functions.Pipeline_Functions.wipe_pipeline_data:main"
 
-[tool.setuptools]
-packages = ["Shared_Functions"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["Shared_Functions*"]

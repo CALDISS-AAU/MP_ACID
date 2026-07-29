@@ -6,7 +6,9 @@ build-backend = "setuptools.build_meta"
 name = "MP_ACID"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "polars>=1.43.1",
+]
 
 [project.scripts]
 create-pipeline = "Shared_Functions.Pipeline_Functions.pipeline_generator:main"

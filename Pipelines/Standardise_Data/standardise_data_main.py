@@ -7,24 +7,27 @@ To run this script, use the following command from the project root:
 ## IMPORTS ##
 # Internal
 from Shared_Functions.logger_functionality import *
-from .Functions.example_functions_script import example_function
+from .Functions.standardise_and_combine_transcriptions import standardise_and_combine_transcriptions
+from .Functions.standardise_and_combine_mouse_tracking import standardise_and_combine_mouse_tracking
 ## _______ ##
 
 
 ## STATIC VARIABLES ##
 # Directories - input
-# INPUT_DIR_AAA = "xxx/yyy.zzz"
+INPUT_DIR_TRANSCRIPTIONS_FOLDER = "/work/MP_ACID/Data/raw/iMotions/Audio_PRIMO_resp_transcribed/csv"
+INPUT_DIR_MOUSE_TRACKING_FOLDER = "/work/MP_ACID/Data/raw/iMotions/MouseData"
 
 # Directories - internal output
 # OUTPUT_DIR_AAA = "Pipelines/Standardise_Data/Data/xxx.zzz"
 
 # Directories - global output
-# OUTPUT_DIR_AAA = "./Data/Standardise_Data/xxx.zzz"
+OUTPUT_DIR_TRANSCRIPTION_DATA = "./Data/Standardise_Data/transcriptions.csv"
+OUTPUT_DIR_MOUSE_TRACKING_DATA = "./Data/Standardise_Data/mouse_tracking.csv"
 
 # Directories - logs
 OUTPUT_DIR_LOG_FULL_PIPELINE = "./Pipelines/Standardise_Data/Logs/full_pipeline.log"
-OUTPUT_DIR_LOG_1 = "./Pipelines/Standardise_Data/Logs/example_1.log"
-OUTPUT_DIR_LOG_2 = "./Pipelines/Standardise_Data/Logs/example_2.log"
+OUTPUT_DIR_LOG_TRANSCRIPTIONS = "./Pipelines/Standardise_Data/Logs/transcriptions.log"
+OUTPUT_DIR_LOG_MOUSE_TRACKING = "./Pipelines/Standardise_Data/Logs/mouse_tracking.log"
 
 ## _______________________ ##
 
@@ -37,26 +40,28 @@ OUTPUT_DIR_LOG_2 = "./Pipelines/Standardise_Data/Logs/example_2.log"
 def main() -> None:
     """Run the full Standardise_Data pipeline."""
 
-    example_function(
-        input_str="Hello",
+    standardise_and_combine_transcriptions(
+        input_folder=INPUT_DIR_TRANSCRIPTIONS_FOLDER,
+        output_dir=OUTPUT_DIR_TRANSCRIPTION_DATA,
         logger=setup_logger(
-            output_dir_log=OUTPUT_DIR_LOG_1,
-            logger_name="standardise_data.step_1",
+            output_dir_log=OUTPUT_DIR_LOG_TRANSCRIPTIONS,
+            logger_name="standardise_data.transcriptions",
         ),
     )
 
-    example_function(
-        input_str="World!",
+    standardise_and_combine_mouse_tracking(
+        input_folder=INPUT_DIR_MOUSE_TRACKING_FOLDER,
+        output_dir=OUTPUT_DIR_MOUSE_TRACKING_DATA,
         logger=setup_logger(
-            output_dir_log=OUTPUT_DIR_LOG_2,
-            logger_name="standardise_data.step_2",
+            output_dir_log=OUTPUT_DIR_LOG_MOUSE_TRACKING,
+            logger_name="standardise_data.mouse_tracking",
         ),
     )
 
     rebuild_pipeline_log(
         step_log_paths=[
-            OUTPUT_DIR_LOG_1,
-            OUTPUT_DIR_LOG_2,
+            OUTPUT_DIR_LOG_TRANSCRIPTIONS,
+            OUTPUT_DIR_LOG_MOUSE_TRACKING,
         ],
         output_dir_log=OUTPUT_DIR_LOG_FULL_PIPELINE,
     )

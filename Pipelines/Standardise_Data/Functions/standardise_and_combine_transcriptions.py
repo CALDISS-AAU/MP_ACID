@@ -45,6 +45,8 @@ def standardise_and_combine_transcriptions(
         logger.info(f"Adding group id ({group_id}) and task id ({task_id}) to {file}")
         df = pl.read_csv(file)
         df = df.with_columns(
+            pl.col("start") * 1000,
+            pl.col("end") * 1000,
             pl.lit(group_id).alias("group"),
             pl.lit(task_id).alias("task")
         )
@@ -55,3 +57,5 @@ def standardise_and_combine_transcriptions(
 
     logger.info("All transcription datasets have been combined into one with the group and task ids as columns")
     logger.info("="*20)
+
+    print(df_combined.head())

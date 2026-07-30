@@ -1,4 +1,4 @@
-"""Helper functions related to mouse tracking in the Standardise_Data pipeline."""
+"""Helper functions related to FEA in the Standardise_Data pipeline."""
 
 ## IMPORTS ##
 import logging
@@ -185,7 +185,7 @@ def _remove_irrelevant_cols(
     return df
 
 ## MAIN FUNCTIONALITY ##
-def standardise_and_combine_mouse_tracking(
+def standardise_and_combine_fea(
     input_folder: str,
     output_dir: str,
     logger: logging.Logger,
@@ -194,7 +194,7 @@ def standardise_and_combine_mouse_tracking(
         Adds group and task ids to individual datasets \
         Combines all datasets"""
     logger.info("="*40)
-    logger.info("Initiate mission: Combine all mouse tracking datasets into one")
+    logger.info("Initiate mission: Combine all FEA datasets into one")
     logger.info("="*40)
 
     list_of_dfs = []
@@ -233,7 +233,7 @@ def standardise_and_combine_mouse_tracking(
     df_combined.write_csv(output_dir)
 
     logger.info("-"*40)
-    logger.info("All mouse tracking datasets have been combined into one with the group and task ids as columns")
+    logger.info("All FEA datasets have been combined into one with the group and task ids as columns")
     logger.info("="*20)
 
     

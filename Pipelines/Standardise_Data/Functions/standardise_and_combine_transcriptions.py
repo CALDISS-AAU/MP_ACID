@@ -57,5 +57,3 @@ def standardise_and_combine_transcriptions(
 
     logger.info("All transcription datasets have been combined into one with the group and task ids as columns")
     logger.info("="*20)
-
-    print(df_combined.head())

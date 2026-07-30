@@ -23,9 +23,10 @@ INPUT_DIR_FEA_FOLDER = "/work/MP_ACID/Data/raw/iMotions/FEA/DDD-F2026-RespCam-FE
 # OUTPUT_DIR_AAA = "Pipelines/Standardise_Data/Data/xxx.zzz"
 
 # Directories - global output
-OUTPUT_DIR_TRANSCRIPTION_DATA = "./Data/Standardise_Data/transcriptions.csv"
-OUTPUT_DIR_MOUSE_TRACKING_DATA = "./Data/Standardise_Data/mouse_tracking.csv"
-OUTPUT_DIR_FEA_DATA = "./Data/Standardise_Data/FEA.csv"
+OUTPUT_BASE = "." #"/work/MP_ACID"
+OUTPUT_DIR_TRANSCRIPTION_DATA = f"{OUTPUT_BASE}/Data/Standardise_Data/transcriptions.csv"
+OUTPUT_DIR_MOUSE_TRACKING_DATA = f"{OUTPUT_BASE}/Data/Standardise_Data/mouse_tracking.csv"
+OUTPUT_DIR_FEA_DATA = f"{OUTPUT_BASE}/Data/Standardise_Data/FEA.csv"
 
 # Directories - logs
 OUTPUT_DIR_LOG_FULL_PIPELINE = "./Pipelines/Standardise_Data/Logs/full_pipeline.log"
@@ -33,6 +34,8 @@ OUTPUT_DIR_LOG_TRANSCRIPTIONS = "./Pipelines/Standardise_Data/Logs/transcription
 OUTPUT_DIR_LOG_MOUSE_TRACKING = "./Pipelines/Standardise_Data/Logs/mouse_tracking.log"
 OUTPUT_DIR_LOG_FEA = "./Pipelines/Standardise_Data/Logs/FEA.log"
 
+# Other
+PERCENT_CERTAINTY = 85
 ## _______________________ ##
 
 
@@ -65,6 +68,7 @@ def main() -> None:
     standardise_and_combine_fea(
         input_folder=INPUT_DIR_FEA_FOLDER,
         output_dir=OUTPUT_DIR_FEA_DATA,
+        percent_certainty=PERCENT_CERTAINTY,
         logger=setup_logger(
             output_dir_log=OUTPUT_DIR_LOG_FEA,
             logger_name="standardise_data.fea",

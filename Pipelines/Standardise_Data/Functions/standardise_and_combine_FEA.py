@@ -80,6 +80,59 @@ def _reduce_to_tasks(
 
     return df_tasks
 
+def _reduce_to_feelings(
+    df: pl.DataFrame,
+    logger: logging.Logger,
+) -> pl.DataFrame:
+    """Keep only rows containing Affectiva facial-expression measurements."""
+
+    original_row_count = df.height
+
+    df_feelings = df.filter(
+        pl.col("Combined Event Source")
+        .str.contains("Affectiva AFFDEX", literal=True)
+        .fill_null(False)
+    )
+
+    non_affectiva_rows = df_feelings.filter(
+        ~pl.col("Combined Event Source")
+        .str.contains("Affectiva AFFDEX", literal=True)
+        .fill_null(False)
+    )
+
+    if non_affectiva_rows.height > 0:
+        raise ValueError(
+            f"Filtering failed: {non_affectiva_rows.height} "
+            "non-Affectiva rows remain"
+        )
+
+    logger.info(
+        "Reduced dataframe from %d to %d rows by retaining Affectiva measurements",
+        original_row_count,
+        df_feelings.height,
+    )
+
+    return df_feelings
+
+def _remove_irrelevant_rows(
+    df: pl.DataFrame,
+    logger: logging.Logger,
+) -> pl.DataFrame:
+    """Remove rows that are irrelevant for downstream analysis."""
+
+    logger.info("Removing rows outside task intervals")
+    df = _reduce_to_tasks(df, logger)
+
+    logger.info("Removing non-facial-analysis rows")
+    df = _reduce_to_feelings(df, logger)
+
+    logger.info(
+        "Remaining event sources: %s",
+        df["Combined Event Source"].unique().sort().to_list(),
+    )
+
+    return df
+
 def _add_task_id(
     df: pl.DataFrame,
     logger: logging.Logger,
@@ -155,12 +208,18 @@ def _remove_irrelevant_cols(
     """Keep only columns required for downstream event analysis."""
 
     relevant_cols = [
+        "Row",
         "Timestamp",
         "group",
         "task",
-        # "SlideEvent", # Indicates start and end of task
-        "InputEventSource",
-        "Data",
+        "Anger",
+        "Contempt",
+        "Disgust",
+        "Fear",
+        "Joy",
+        "Sadness",
+        "Surprise",
+        "Valence",
     ]
 
     irrelevant_cols = [
@@ -184,10 +243,50 @@ def _remove_irrelevant_cols(
 
     return df
 
+def _transform_feelings_to_bool(
+    df: pl.DataFrame,
+    percent_certainty: float,
+    logger: logging.Logger,
+) -> pl.DataFrame:
+    """Convert emotion scores to binary values using a certainty threshold."""
+
+    if not 0 <= percent_certainty <= 100:
+        raise ValueError(
+            "percent_certainty must be between 0 and 100"
+        )
+
+    feeling_cols = [
+        "Anger",
+        "Contempt",
+        "Disgust",
+        "Fear",
+        "Joy",
+        "Sadness",
+        "Surprise",
+    ]
+
+    df = df.with_columns(
+        [
+            (pl.col(col) >= percent_certainty)
+            .fill_null(False)
+            .cast(pl.Int8)
+            .alias(col)
+            for col in feeling_cols
+        ]
+    )
+
+    logger.info(
+        "Converted emotion scores to binary values using a %.1f threshold",
+        percent_certainty,
+    )
+
+    return df
+
 ## MAIN FUNCTIONALITY ##
 def standardise_and_combine_fea(
     input_folder: str,
     output_dir: str,
+    percent_certainty: float,
     logger: logging.Logger,
 ) -> None:
     """Removes metadata. \
@@ -204,7 +303,7 @@ def standardise_and_combine_fea(
     logger.info("-"*40)
     for file in Path(input_folder).glob("*.csv"):
         group_id = _extract_group(file, logger)
-        df = pl.read_csv(file, skip_rows=22)
+        df = pl.read_csv(file, skip_rows=24, infer_schema_length=None)
         logger.info(f"Read {file} into a new dataframe and skipping the metadata")
         logger.info("-"*20)
         logger.info(f"Adding group id ({group_id}) to {file}")
@@ -213,8 +312,7 @@ def standardise_and_combine_fea(
         )
 
         logger.info("-"*20)
-        logger.info("Removing rows before and after tasks")
-        df = _reduce_to_tasks(df, logger)
+        df = _remove_irrelevant_rows(df, logger)
 
         logger.info("-"*20)
         logger.info("Adding task id")
@@ -229,11 +327,21 @@ def standardise_and_combine_fea(
     df_combined = pl.concat(list_of_dfs)
     logger.info("-"*20)
     logger.info("Removing irrelevant cols")
-    df_combined = _remove_irrelevant_cols(df, logger)
+    df_combined = _remove_irrelevant_cols(df_combined, logger)
+
+    logger.info("-" * 20)
+    logger.info(
+        "Transforming emotion scores using %s%% certainty",
+        percent_certainty,
+    )
+    df_combined = _transform_feelings_to_bool(
+        df_combined,
+        percent_certainty,
+        logger,
+    )
+
     df_combined.write_csv(output_dir)
 
     logger.info("-"*40)
     logger.info("All FEA datasets have been combined into one with the group and task ids as columns")
     logger.info("="*20)
-
-    

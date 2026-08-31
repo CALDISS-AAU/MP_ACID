@@ -203,6 +203,7 @@ def _reset_time(
 
 def _remove_irrelevant_cols(
     df: pl.DataFrame,
+    feeling_cols: list,
     logger: logging.Logger,
 ) -> pl.DataFrame:
     """Keep only columns required for downstream event analysis."""
@@ -212,14 +213,7 @@ def _remove_irrelevant_cols(
         "Timestamp",
         "group",
         "task",
-        "Anger",
-        "Contempt",
-        "Disgust",
-        "Fear",
-        "Joy",
-        "Sadness",
-        "Surprise",
-        "Valence",
+        *feeling_cols
     ]
 
     irrelevant_cols = [
@@ -246,6 +240,7 @@ def _remove_irrelevant_cols(
 def _transform_feelings_to_bool(
     df: pl.DataFrame,
     percent_certainty: float,
+    feeling_cols: list,
     logger: logging.Logger,
 ) -> pl.DataFrame:
     """Convert emotion scores to binary values using a certainty threshold."""
@@ -254,16 +249,6 @@ def _transform_feelings_to_bool(
         raise ValueError(
             "percent_certainty must be between 0 and 100"
         )
-
-    feeling_cols = [
-        "Anger",
-        "Contempt",
-        "Disgust",
-        "Fear",
-        "Joy",
-        "Sadness",
-        "Surprise",
-    ]
 
     df = df.with_columns(
         [
@@ -287,6 +272,7 @@ def standardise_and_combine_fea(
     input_folder: str,
     output_dir: str,
     percent_certainty: float,
+    feeling_cols: list,
     logger: logging.Logger,
 ) -> None:
     """Removes metadata. \
@@ -327,7 +313,7 @@ def standardise_and_combine_fea(
     df_combined = pl.concat(list_of_dfs)
     logger.info("-"*20)
     logger.info("Removing irrelevant cols")
-    df_combined = _remove_irrelevant_cols(df_combined, logger)
+    df_combined = _remove_irrelevant_cols(df_combined, feeling_cols, logger)
 
     logger.info("-" * 20)
     logger.info(
@@ -337,6 +323,7 @@ def standardise_and_combine_fea(
     df_combined = _transform_feelings_to_bool(
         df_combined,
         percent_certainty,
+        feeling_cols,
         logger,
     )
 

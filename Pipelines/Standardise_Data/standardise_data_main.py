@@ -36,6 +36,18 @@ OUTPUT_DIR_LOG_FEA = "./Pipelines/Standardise_Data/Logs/FEA.log"
 
 # Other
 PERCENT_CERTAINTY = [75, 80, 85, 90, 95, 99]
+
+feeling_cols = [
+    "Anger",
+    "Contempt",
+    "Confusion",
+    "Disgust",
+    "Engagement",
+    "Fear",
+    "Joy",
+    "Sadness",
+    "Surprise",
+]
 ## _______________________ ##
 
 
@@ -70,6 +82,7 @@ def main() -> None:
             input_folder=INPUT_DIR_FEA_FOLDER,
             output_dir=f"{OUTPUT_DIR_FEA_DATA_BASE}_{pc}.csv",
             percent_certainty=pc,
+            feeling_cols=feeling_cols,
             logger=setup_logger(
                 output_dir_log=OUTPUT_DIR_LOG_FEA,
                 logger_name="standardise_data.fea",

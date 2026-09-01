@@ -20,7 +20,8 @@ INPUT_DIR_FEA_DATA_FOLDER = f"{INPUT_BASE}/Data/Standardise_Data"
 INPUT_FILE_PATTERN = "FEA_*.csv"
 
 # Directories - internal output
-OUTPUT_DIR_PLOTS_FOLDER = "Pipelines/Feelings_Investigation/Data/Plots/Graphs"
+OUTPUT_DIR_GRAPH_PLOTS_FOLDER = "Pipelines/Feelings_Investigation/Data/Plots/Graphs"
+OUTPUT_DIR_BOX_PLOTS_FOLDER = "Pipelines/Feelings_Investigation/Data/Plots/Box"
 
 # Directories - global output
 # OUTPUT_DIR_AAA = "./Data/Feelings_Investigation/xxx.zzz"
@@ -66,7 +67,14 @@ def main() -> None:
     for file in input_files:
         feeling_vs_time_graph(
             input_file=file,
-            output_folder=OUTPUT_DIR_PLOTS_FOLDER,
+            output_folder=OUTPUT_DIR_GRAPH_PLOTS_FOLDER,
+            feeling_cols=feeling_cols,
+            logger=logger_plots,
+        )
+
+        feeling_sequence_distribution_graph(
+            input_file=file,
+            output_folder=OUTPUT_DIR_BOX_PLOTS_FOLDER,
             feeling_cols=feeling_cols,
             logger=logger_plots,
         )

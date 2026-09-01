@@ -26,7 +26,7 @@ INPUT_DIR_FEA_FOLDER = "/work/MP_ACID/Data/raw/iMotions/FEA/DDD-F2026-RespCam-FE
 OUTPUT_BASE = "." #"/work/MP_ACID"
 OUTPUT_DIR_TRANSCRIPTION_DATA = f"{OUTPUT_BASE}/Data/Standardise_Data/transcriptions.csv"
 OUTPUT_DIR_MOUSE_TRACKING_DATA = f"{OUTPUT_BASE}/Data/Standardise_Data/mouse_tracking.csv"
-OUTPUT_DIR_FEA_DATA = f"{OUTPUT_BASE}/Data/Standardise_Data/FEA.csv"
+OUTPUT_DIR_FEA_DATA_BASE = f"{OUTPUT_BASE}/Data/Standardise_Data/FEA"
 
 # Directories - logs
 OUTPUT_DIR_LOG_FULL_PIPELINE = "./Pipelines/Standardise_Data/Logs/full_pipeline.log"
@@ -35,7 +35,19 @@ OUTPUT_DIR_LOG_MOUSE_TRACKING = "./Pipelines/Standardise_Data/Logs/mouse_trackin
 OUTPUT_DIR_LOG_FEA = "./Pipelines/Standardise_Data/Logs/FEA.log"
 
 # Other
-PERCENT_CERTAINTY = 85
+PERCENT_CERTAINTY = [75, 80, 85, 90, 95, 99]
+
+feeling_cols = [
+    "Anger",
+    "Contempt",
+    "Confusion",
+    "Disgust",
+    "Engagement",
+    "Fear",
+    "Joy",
+    "Sadness",
+    "Surprise",
+]
 ## _______________________ ##
 
 
@@ -65,15 +77,17 @@ def main() -> None:
         ),
     )
 
-    standardise_and_combine_fea(
-        input_folder=INPUT_DIR_FEA_FOLDER,
-        output_dir=OUTPUT_DIR_FEA_DATA,
-        percent_certainty=PERCENT_CERTAINTY,
-        logger=setup_logger(
-            output_dir_log=OUTPUT_DIR_LOG_FEA,
-            logger_name="standardise_data.fea",
-        ),
-    )
+    for pc in PERCENT_CERTAINTY:
+        standardise_and_combine_fea(
+            input_folder=INPUT_DIR_FEA_FOLDER,
+            output_dir=f"{OUTPUT_DIR_FEA_DATA_BASE}_{pc}.csv",
+            percent_certainty=pc,
+            feeling_cols=feeling_cols,
+            logger=setup_logger(
+                output_dir_log=OUTPUT_DIR_LOG_FEA,
+                logger_name="standardise_data.fea",
+            ),
+        )
 
     rebuild_pipeline_log(
         step_log_paths=[

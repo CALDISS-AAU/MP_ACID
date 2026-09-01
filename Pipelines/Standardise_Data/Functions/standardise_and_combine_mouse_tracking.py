@@ -155,6 +155,7 @@ def _remove_irrelevant_cols(
     """Keep only columns required for downstream event analysis."""
 
     relevant_cols = [
+        "Row",
         "Timestamp",
         "group",
         "task",

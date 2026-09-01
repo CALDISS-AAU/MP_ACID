@@ -18,5 +18,8 @@ Pipelines/*/Data/*
 # Logs
 Pipelines/*/Logs/*
 
+# Filetypes
+*.png
+
 # Keep .gitkeep
 !.gitkeep

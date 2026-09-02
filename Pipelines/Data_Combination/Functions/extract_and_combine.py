@@ -166,10 +166,81 @@ def _add_present_feelings(
 
     return result
 
+
+def _add_input_events(
+    input_dir: str,
+    final_data: pl.DataFrame,
+    logger: logging.Logger,
+) -> pl.DataFrame:
+    input_data = pl.read_csv(input_dir).sort(
+        ["group", "task", "Timestamp"]
+    )
+
+    # Organize input-event rows by group and task.
+    input_lookup = {}
+
+    for row in input_data.iter_rows(named=True):
+        key = (row["group"], row["task"])
+        input_lookup.setdefault(key, []).append(row)
+
+    mouse_coordinates_per_interval = []
+    input_sources_per_interval = []
+
+    for interval in final_data.iter_rows(named=True):
+        key = (interval["group"], interval["task"])
+        rows = input_lookup.get(key, [])
+
+        # Select input events within the transcription interval.
+        matching_rows = [
+            row
+            for row in rows
+            if (
+                interval["transcription_start"]
+                <= row["Timestamp"]
+                <= interval["transcription_end"]
+            )
+        ]
+
+        mouse_coordinates = [
+            row["Data"]
+            for row in matching_rows
+            if row["InputEventSource"] == "Mouse"
+        ]
+
+        # dict.fromkeys removes duplicates while preserving order.
+        input_sources = list(dict.fromkeys(
+            row["InputEventSource"]
+            for row in matching_rows
+            if row["InputEventSource"] is not None
+        ))
+
+        mouse_coordinates_per_interval.append(mouse_coordinates)
+        input_sources_per_interval.append(input_sources)
+
+    result = final_data.with_columns(
+        pl.Series(
+            "MouseCoordinates",
+            mouse_coordinates_per_interval,
+            dtype=pl.List(pl.String),
+        ),
+        pl.Series(
+            "InputEventSources",
+            input_sources_per_interval,
+            dtype=pl.List(pl.String),
+        ),
+    )
+
+    logger.info(
+        "Added input events to %d transcription intervals",
+        result.height,
+    )
+
+    return result
 ## MAIN FUNCTIONALITY ##
 def extract_and_combine(
     input_dir_fea_data: str,
     input_dir_transcription_data: str,
+    input_dir_mouse_data: str,
     relevant_feelings: list[str],
     logger: logging.Logger,
 ) -> pl.DataFrame:
@@ -192,6 +263,17 @@ def extract_and_combine(
         logger=logger,
     )
 
-    logger.info(final_data.head(10))
+    final_data = _add_input_events(
+        input_dir=input_dir_mouse_data,
+        final_data=final_data,
+        logger=logger,
+    )
 
+    logger.info(final_data.head(10))
+    # logger.info(
+    #     "%s",
+    #     final_data
+    #     .filter(pl.col("group") == "A5")
+    #     .head(10),
+    # )
     return final_data

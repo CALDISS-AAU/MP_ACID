@@ -16,6 +16,7 @@ from .Functions.extract_and_combine import extract_and_combine
 INPUT_DIR_BASE = "."
 INPUT_DIR_FEA_DATA = f"{INPUT_DIR_BASE}/Data/Standardise_Data/FEA_85.csv"
 INPUT_DIR_TRANSCRIPTION_DATA = f"{INPUT_DIR_BASE}/Data/Standardise_Data/transcriptions.csv"
+INPUT_DIR_MOUSE_DATA = f"{INPUT_DIR_BASE}/Data/Standardise_Data/mouse_tracking.csv"
 
 # Directories - internal output
 # OUTPUT_DIR_AAA = "Pipelines/Data_Combination/Data/xxx.zzz"
@@ -54,6 +55,7 @@ def main() -> None:
     timestamps = extract_and_combine(
         input_dir_fea_data=INPUT_DIR_FEA_DATA,
         input_dir_transcription_data=INPUT_DIR_TRANSCRIPTION_DATA,
+        input_dir_mouse_data=INPUT_DIR_MOUSE_DATA,
         relevant_feelings=feeling_cols,
         logger=setup_logger(
             output_dir_log=OUTPUT_DIR_LOG_1,

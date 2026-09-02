@@ -13,8 +13,9 @@ from .Functions.extract_and_combine import extract_and_combine
 
 ## STATIC VARIABLES ##
 # Directories - input
-INPUT_DIR_FEA_DATA = "/work/ACID/MP_ACID/Data/Standardise_Data/FEA_85.csv"
-INPUT_DIR_TRANSCRIPTION_DATA = "/work/ACID/MP_ACID/Data/Standardise_Data/transcriptions.csv"
+INPUT_DIR_BASE = "."
+INPUT_DIR_FEA_DATA = f"{INPUT_DIR_BASE}/Data/Standardise_Data/FEA_85.csv"
+INPUT_DIR_TRANSCRIPTION_DATA = f"{INPUT_DIR_BASE}/Data/Standardise_Data/transcriptions.csv"
 
 # Directories - internal output
 # OUTPUT_DIR_AAA = "Pipelines/Data_Combination/Data/xxx.zzz"

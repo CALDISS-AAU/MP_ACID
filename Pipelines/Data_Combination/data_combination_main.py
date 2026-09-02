@@ -7,13 +7,14 @@ To run this script, use the following command from the project root:
 ## IMPORTS ##
 # Internal
 from Shared_Functions.logger_functionality import *
-from .Functions.example_functions_script import example_function
+from .Functions.extract_and_combine import extract_and_combine
 ## _______ ##
 
 
 ## STATIC VARIABLES ##
 # Directories - input
-# INPUT_DIR_AAA = "xxx/yyy.zzz"
+INPUT_DIR_FEA_DATA = "/work/ACID/MP_ACID/Data/Standardise_Data/FEA_85.csv"
+INPUT_DIR_TRANSCRIPTION_DATA = "/work/ACID/MP_ACID/Data/Standardise_Data/transcriptions.csv"
 
 # Directories - internal output
 # OUTPUT_DIR_AAA = "Pipelines/Data_Combination/Data/xxx.zzz"
@@ -23,8 +24,20 @@ from .Functions.example_functions_script import example_function
 
 # Directories - logs
 OUTPUT_DIR_LOG_FULL_PIPELINE = "./Pipelines/Data_Combination/Logs/full_pipeline.log"
-OUTPUT_DIR_LOG_1 = "./Pipelines/Data_Combination/Logs/example_1.log"
-OUTPUT_DIR_LOG_2 = "./Pipelines/Data_Combination/Logs/example_2.log"
+OUTPUT_DIR_LOG_1 = "./Pipelines/Data_Combination/Logs/extract_feelings_timestamp.log"
+
+# Other
+feeling_cols = [
+    "Anger",
+    "Contempt",
+    "Confusion",
+    "Disgust",
+    # "Engagement",
+    "Fear",
+    # "Joy",
+    "Sadness",
+    "Surprise",
+]
 
 ## _______________________ ##
 
@@ -37,26 +50,19 @@ OUTPUT_DIR_LOG_2 = "./Pipelines/Data_Combination/Logs/example_2.log"
 def main() -> None:
     """Run the full Data_Combination pipeline."""
 
-    example_function(
-        input_str="Hello",
+    timestamps = extract_and_combine(
+        input_dir_fea_data=INPUT_DIR_FEA_DATA,
+        input_dir_transcription_data=INPUT_DIR_TRANSCRIPTION_DATA,
+        relevant_feelings=feeling_cols,
         logger=setup_logger(
             output_dir_log=OUTPUT_DIR_LOG_1,
             logger_name="data_combination.step_1",
         ),
     )
 
-    example_function(
-        input_str="World!",
-        logger=setup_logger(
-            output_dir_log=OUTPUT_DIR_LOG_2,
-            logger_name="data_combination.step_2",
-        ),
-    )
-
     rebuild_pipeline_log(
         step_log_paths=[
             OUTPUT_DIR_LOG_1,
-            OUTPUT_DIR_LOG_2,
         ],
         output_dir_log=OUTPUT_DIR_LOG_FULL_PIPELINE,
     )

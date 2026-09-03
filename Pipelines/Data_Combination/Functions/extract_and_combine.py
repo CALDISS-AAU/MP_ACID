@@ -4,31 +4,42 @@
 import logging
 import polars as pl
 from bisect import bisect_right
+from typing import Any
+from pathlib import Path
 ## _______ ##
 
 
+## DEFINITIONS ##
+Row = dict[str, Any]
+Lookup = dict[tuple[str, str], list[Row]]
+## ___________ ##
+
 ## HELPER FUNCTIONS ##
 def _extract_feeling_timestamps(
-    input_dir: str,
+    feelings_data: pl.DataFrame,
     relevant_feelings: list[str],
     logger: logging.Logger,
 ) -> pl.DataFrame:
     events = (
-        pl.read_csv(input_dir)
+        feelings_data
         .filter(pl.any_horizontal(pl.col(relevant_feelings) == 1))
         .select("group", "task", "Timestamp")
     )
 
-    logger.info("Extracted %d timestamp rows based on feelings", events.height)
+    logger.info(
+        "Extracted %d timestamp rows based on feelings",
+        events.height,
+    )
+
     return events
 
 
 def _extract_matching_transcriptions(
-    input_dir: str,
+    transcription_data: pl.DataFrame,
     events: pl.DataFrame,
     logger: logging.Logger,
 ) -> pl.DataFrame:
-    transcriptions = pl.read_csv(input_dir).sort(
+    transcriptions = transcription_data.sort(
         ["group", "task", "start"]
     )
 
@@ -110,39 +121,71 @@ def _extract_matching_transcriptions(
     return result
 
 
+def _build_group_task_lookup(
+    data: pl.DataFrame,
+) -> Lookup:
+    """Organize dataframe rows by group and task."""
+    lookup = {}
+
+    for row in data.iter_rows(named=True):
+        key = (row["group"], row["task"])
+        lookup.setdefault(key, []).append(row)
+
+    return lookup
+
+
+def _get_matching_interval_rows(
+    interval: Row,
+    lookup: Lookup,
+) -> list[Row]:
+    """Find rows with the same group/task inside an interval."""
+    key = (interval["group"], interval["task"])
+    rows = lookup.get(key, [])
+
+    return [
+        row
+        for row in rows
+        if (
+            interval["transcription_start"]
+            <= row["Timestamp"]
+            <= interval["transcription_end"]
+        )
+    ]
+
+
+def _add_list_columns(
+    data: pl.DataFrame,
+    columns: dict[str, list[list[str]]],
+) -> pl.DataFrame:
+    """Add one or more string-list columns to a dataframe."""
+    return data.with_columns(
+        [
+            pl.Series(
+                name,
+                values,
+                dtype=pl.List(pl.String),
+            )
+            for name, values in columns.items()
+        ]
+    )
+
+
 def _add_present_feelings(
-    input_dir: str,
+    feelings_data: pl.DataFrame,
     final_data: pl.DataFrame,
     relevant_feelings: list[str],
     logger: logging.Logger,
 ) -> pl.DataFrame:
-    feelings_data = pl.read_csv(input_dir)
-
-    # Organize feeling rows by group and task.
-    feelings_lookup = {}
-
-    for row in feelings_data.iter_rows(named=True):
-        key = (row["group"], row["task"])
-        feelings_lookup.setdefault(key, []).append(row)
-
+    """Add all relevant feelings present in each interval."""
+    feelings_lookup = _build_group_task_lookup(feelings_data)
     feelings_per_interval = []
 
     for interval in final_data.iter_rows(named=True):
-        key = (interval["group"], interval["task"])
-        rows = feelings_lookup.get(key, [])
+        matching_rows = _get_matching_interval_rows(
+            interval=interval,
+            lookup=feelings_lookup,
+        )
 
-        # Select feeling rows within this transcription interval.
-        matching_rows = [
-            row
-            for row in rows
-            if (
-                interval["transcription_start"]
-                <= row["Timestamp"]
-                <= interval["transcription_end"]
-            )
-        ]
-
-        # Include each feeling if it occurs at least once in the interval.
         present_feelings = [
             feeling
             for feeling in relevant_feelings
@@ -151,12 +194,11 @@ def _add_present_feelings(
 
         feelings_per_interval.append(present_feelings)
 
-    result = final_data.with_columns(
-        pl.Series(
-            "present_feelings",
-            feelings_per_interval,
-            dtype=pl.List(pl.String),
-        )
+    result = _add_list_columns(
+        data=final_data,
+        columns={
+            "present_feelings": feelings_per_interval,
+        },
     )
 
     logger.info(
@@ -168,38 +210,20 @@ def _add_present_feelings(
 
 
 def _add_input_events(
-    input_dir: str,
+    input_data: pl.DataFrame,
     final_data: pl.DataFrame,
     logger: logging.Logger,
 ) -> pl.DataFrame:
-    input_data = pl.read_csv(input_dir).sort(
-        ["group", "task", "Timestamp"]
-    )
-
-    # Organize input-event rows by group and task.
-    input_lookup = {}
-
-    for row in input_data.iter_rows(named=True):
-        key = (row["group"], row["task"])
-        input_lookup.setdefault(key, []).append(row)
-
+    """Add mouse coordinates and input sources to each interval."""
+    input_lookup = _build_group_task_lookup(input_data)
     mouse_coordinates_per_interval = []
     input_sources_per_interval = []
 
     for interval in final_data.iter_rows(named=True):
-        key = (interval["group"], interval["task"])
-        rows = input_lookup.get(key, [])
-
-        # Select input events within the transcription interval.
-        matching_rows = [
-            row
-            for row in rows
-            if (
-                interval["transcription_start"]
-                <= row["Timestamp"]
-                <= interval["transcription_end"]
-            )
-        ]
+        matching_rows = _get_matching_interval_rows(
+            interval=interval,
+            lookup=input_lookup,
+        )
 
         mouse_coordinates = [
             row["Data"]
@@ -207,7 +231,6 @@ def _add_input_events(
             if row["InputEventSource"] == "Mouse"
         ]
 
-        # dict.fromkeys removes duplicates while preserving order.
         input_sources = list(dict.fromkeys(
             row["InputEventSource"]
             for row in matching_rows
@@ -217,17 +240,12 @@ def _add_input_events(
         mouse_coordinates_per_interval.append(mouse_coordinates)
         input_sources_per_interval.append(input_sources)
 
-    result = final_data.with_columns(
-        pl.Series(
-            "MouseCoordinates",
-            mouse_coordinates_per_interval,
-            dtype=pl.List(pl.String),
-        ),
-        pl.Series(
-            "InputEventSources",
-            input_sources_per_interval,
-            dtype=pl.List(pl.String),
-        ),
+    result = _add_list_columns(
+        data=final_data,
+        columns={
+            "MouseCoordinates": mouse_coordinates_per_interval,
+            "InputEventSources": input_sources_per_interval,
+        },
     )
 
     logger.info(
@@ -236,44 +254,87 @@ def _add_input_events(
     )
 
     return result
+    
+
+def _save_combined_data(
+    data: pl.DataFrame,
+    output_path_base: str,
+    logger: logging.Logger,
+) -> None:
+    """Save combined data as CSV and JSON."""
+    output_base = Path(output_path_base)
+    output_base.parent.mkdir(parents=True, exist_ok=True)
+
+    output_path_csv = output_base.with_suffix(".csv")
+    output_path_json = output_base.with_suffix(".json")
+
+    list_columns = [
+        "present_feelings",
+        "MouseCoordinates",
+        "InputEventSources",
+    ]
+
+    # CSV cannot store lists, so convert them to pipe-separated strings.
+    csv_data = data.with_columns(
+        [
+            pl.col(column).list.join("|")
+            for column in list_columns
+        ]
+    )
+
+    csv_data.write_csv(output_path_csv)
+
+    # JSON preserves the list columns.
+    data.write_json(output_path_json)
+
+    logger.info(
+        "Saved %d combined rows to %s and %s",
+        data.height,
+        output_path_csv,
+        output_path_json,
+    )
+
+
 ## MAIN FUNCTIONALITY ##
 def extract_and_combine(
     input_dir_fea_data: str,
     input_dir_transcription_data: str,
     input_dir_mouse_data: str,
+    output_path_base: str,
     relevant_feelings: list[str],
     logger: logging.Logger,
-) -> pl.DataFrame:
+) -> None:
+    feelings_data = pl.read_csv(input_dir_fea_data)
+    transcription_data = pl.read_csv(input_dir_transcription_data)
+    input_data = pl.read_csv(input_dir_mouse_data)
+
     events = _extract_feeling_timestamps(
-        input_dir=input_dir_fea_data, 
-        relevant_feelings=relevant_feelings, 
-        logger=logger
+        feelings_data=feelings_data,
+        relevant_feelings=relevant_feelings,
+        logger=logger,
     )
 
     final_data = _extract_matching_transcriptions(
-        input_dir=input_dir_transcription_data,
+        transcription_data=transcription_data,
         events=events,
         logger=logger,
     )
 
     final_data = _add_present_feelings(
-        input_dir=input_dir_fea_data,
+        feelings_data=feelings_data,
         final_data=final_data,
         relevant_feelings=relevant_feelings,
         logger=logger,
     )
 
     final_data = _add_input_events(
-        input_dir=input_dir_mouse_data,
+        input_data=input_data,
         final_data=final_data,
         logger=logger,
     )
 
-    logger.info(final_data.head(10))
-    # logger.info(
-    #     "%s",
-    #     final_data
-    #     .filter(pl.col("group") == "A5")
-    #     .head(10),
-    # )
-    return final_data
+    _save_combined_data(
+        data=final_data,
+        output_path_base=output_path_base,
+        logger=logger,
+    )

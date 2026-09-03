@@ -22,7 +22,7 @@ INPUT_DIR_MOUSE_DATA = f"{INPUT_DIR_BASE}/Data/Standardise_Data/mouse_tracking.c
 # OUTPUT_DIR_AAA = "Pipelines/Data_Combination/Data/xxx.zzz"
 
 # Directories - global output
-# OUTPUT_DIR_AAA = "./Data/Data_Combination/xxx.zzz"
+OUTPUT_BASE_COMBINED_DATA = "./Data/Data_Combination/combined_data_when_feelings"
 
 # Directories - logs
 OUTPUT_DIR_LOG_FULL_PIPELINE = "./Pipelines/Data_Combination/Logs/full_pipeline.log"
@@ -52,10 +52,11 @@ feeling_cols = [
 def main() -> None:
     """Run the full Data_Combination pipeline."""
 
-    timestamps = extract_and_combine(
+    extract_and_combine(
         input_dir_fea_data=INPUT_DIR_FEA_DATA,
         input_dir_transcription_data=INPUT_DIR_TRANSCRIPTION_DATA,
         input_dir_mouse_data=INPUT_DIR_MOUSE_DATA,
+        output_path_base=OUTPUT_BASE_COMBINED_DATA,
         relevant_feelings=feeling_cols,
         logger=setup_logger(
             output_dir_log=OUTPUT_DIR_LOG_1,

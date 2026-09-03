@@ -230,7 +230,7 @@ def standardise_and_combine_mouse_tracking(
     df_combined = pl.concat(list_of_dfs)
     logger.info("-"*20)
     logger.info("Removing irrelevant cols")
-    df_combined = _remove_irrelevant_cols(df, logger)
+    df_combined = _remove_irrelevant_cols(df_combined, logger)
     df_combined.write_csv(output_dir)
 
     logger.info("-"*40)

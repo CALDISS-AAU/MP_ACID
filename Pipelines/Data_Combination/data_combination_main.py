@@ -14,7 +14,7 @@ from .Functions.extract_and_combine import extract_and_combine
 ## STATIC VARIABLES ##
 # Directories - input
 INPUT_DIR_BASE = "."
-INPUT_DIR_FEA_DATA = f"{INPUT_DIR_BASE}/Data/Standardise_Data/FEA_85.csv"
+INPUT_DIR_FEA_DATA = f"{INPUT_DIR_BASE}/Data/Standardise_Data/FEA_75.csv"
 INPUT_DIR_TRANSCRIPTION_DATA = f"{INPUT_DIR_BASE}/Data/Standardise_Data/transcriptions.csv"
 INPUT_DIR_MOUSE_DATA = f"{INPUT_DIR_BASE}/Data/Standardise_Data/mouse_tracking.csv"
 
@@ -22,7 +22,7 @@ INPUT_DIR_MOUSE_DATA = f"{INPUT_DIR_BASE}/Data/Standardise_Data/mouse_tracking.c
 # OUTPUT_DIR_AAA = "Pipelines/Data_Combination/Data/xxx.zzz"
 
 # Directories - global output
-OUTPUT_BASE_COMBINED_DATA = "./Data/Data_Combination/combined_data_when_feelings"
+OUTPUT_BASE_COMBINED_DATA = "./Data/Data_Combination/combined_data_when_feelings_75"
 
 # Directories - logs
 OUTPUT_DIR_LOG_FULL_PIPELINE = "./Pipelines/Data_Combination/Logs/full_pipeline.log"

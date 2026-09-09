@@ -22,30 +22,46 @@ def _frames_are_similar(frame1, frame2, tolerance_pct = 10):
 
     return below_tolerance
 
-def _get_framearrays_from_interval(
+def iter_framearrays(
     cap,
     start_s,
     stop_s,
-    dt):
+    dt,
+    use_resolution: dict | None = None
+):
+    """Yield (timestamp_seconds, BGR array) samples, optionally resized."""
 
-    framearrays = []
+    if dt <= 0:
+        raise ValueError("Frame sampling interval must be positive")
 
     timestamp_s = float(start_s)
 
     while timestamp_s < stop_s:
-        # Seek to the requested timestamp.
         cap.set(cv2.CAP_PROP_POS_MSEC, timestamp_s * 1000)
-
         success, frame = cap.read()
 
         if not success:
             break
 
-        framearrays.append((timestamp_s, frame))
-        
+        if use_resolution is not None:
+            frame = cv2.resize(
+                frame,
+                (use_resolution["width"], use_resolution["height"]),
+                interpolation = cv2.INTER_AREA
+            )
+
+        yield timestamp_s, frame
         timestamp_s += dt
 
-    return framearrays
+
+def _get_framearrays_from_interval(
+    cap,
+    start_s,
+    stop_s,
+    dt,
+    use_resolution: dict | None = None
+):
+    return list(iter_framearrays(cap, start_s, stop_s, dt, use_resolution))
 
 def _aggregate_framearrays(
     framearrays,
@@ -74,7 +90,7 @@ def _aggregate_framearrays(
         interval_start = timestamp_s
         representative_frame = frame
 
-    interval_end = min(timestamp_s + dt, stop_s)
+    interval_end = min(framearrays[-1][0] + dt, stop_s)
     aggregated_framearrays.append(
         (interval_start, interval_end, representative_frame)
     )
@@ -141,7 +157,10 @@ def extract_framearrays(
         stop_s = min(time_interval.stop / 1000, duration_s)
         dt = 1 / freq_per_s
 
-        framearrays = _get_framearrays_from_interval(cap, start_s, stop_s, dt)
+        framearrays = _get_framearrays_from_interval(
+            cap, start_s, stop_s, dt,
+            use_resolution = use_resolution if standardize_resolution else None
+        )
 
         framearrays_aggregated = _aggregate_framearrays(framearrays, start_s, stop_s, dt)
 

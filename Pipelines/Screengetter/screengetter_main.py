@@ -13,7 +13,7 @@ import numpy as np
 
 # Internal
 #from Shared_Functions.logger_functionality import *
-from .Functions.check_resolutions import determine_smallest_resolution
+from .Functions.create_reference import create_reference
 from .Functions.arrays_from_frames import extract_framearrays
 
 ## _______ ##
@@ -28,6 +28,7 @@ INPUT_DIR_SCREENRECS = INPUT_DIR_RAW / "ScreenRecordings_PRIMO"
 # Directories - internal output
 OUTPUT_DIR_INT = Path(".") / "Pipelines" / "Screengetter" / "Data"
 OUTPUT_FRAMEARRAYS = OUTPUT_DIR_INT / "Framearrays"
+OUTPUT_REFERENCE = OUTPUT_DIR_INT / "Reference"
 
 # Directories - global output
 OUTPUT_BASE = Path(".") / "Data" / "Screengetter"
@@ -114,29 +115,34 @@ def _store_framearrays(
 def main(input_data = event_timestamps) -> None:
     """Run the full Screengetter pipeline."""
 
-    smallest_resolution = determine_smallest_resolution(
-        files = list(INPUT_DIR_SCREENRECS.glob("*")),
-        output_dir = OUTPUT_DIR_INT,
-        replace_resolutions=False
+    reference_lookup = create_reference(
+        input_dir = INPUT_DIR_SCREENRECS,
+        output_dir = OUTPUT_REFERENCE
     )
+    smallest_resolution = {
+        "width": reference_lookup[0]["width"],
+        "height": reference_lookup[0]["height"]
+    }
 
-    group = input_data.get("group")
-    task = input_data.get("task")
-    event_ranges = input_data.get("event_ranges")
-
-    screenrec_filepath = _get_filename(group, task)
-    
-    framearrays_in_intervals = extract_framearrays(
-        screenrec_filepath,
-        event_ranges,
-        freq_per_s = 1
-    )
-
-    _store_framearrays(
-        framearrays_in_intervals, 
-        group, 
-        task
-    )
+    #group = input_data.get("group")
+    #task = input_data.get("task")
+    #event_ranges = input_data.get("event_ranges")
+#
+    #screenrec_filepath = _get_filename(group, task)
+    #
+    #framearrays_in_intervals = extract_framearrays(
+    #    screenrec_filepath,
+    #    event_ranges,
+    #    freq_per_s = 1,
+    #    standardize_resolution = True,
+    #    use_resolution = smallest_resolution
+    #)
+#
+    #_store_framearrays(
+    #    framearrays_in_intervals, 
+    #    group, 
+    #    task
+    #)
 
 
     

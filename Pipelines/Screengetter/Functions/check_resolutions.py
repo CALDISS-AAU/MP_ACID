@@ -12,9 +12,14 @@ def determine_smallest_resolution(
     files: Iterable[Path],
     output_dir: Path,
     replace_resolutions = False
-) -> list[dict[str, str]]:
+) -> dict[str, int]:
     """Read video resolutions and returns smallest resolution"""
 
+    files = list(files)
+    if not files:
+        raise ValueError("No video files supplied")
+
+    output_dir.mkdir(parents = True, exist_ok = True)
     output_path = output_dir / "resolutions.json"
 
     if output_path.is_file() and not replace_resolutions:
@@ -42,6 +47,9 @@ def determine_smallest_resolution(
 
                 width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                if width <= 0 or height <= 0:
+                    raise ValueError(f"Invalid video resolution: {video_path}")
+
                 total = width*height
 
                 resolutions.append(
@@ -54,6 +62,7 @@ def determine_smallest_resolution(
                 )
 
                 if total < smallest_total:
+                    smallest_total = total
                     smallest_resolution = {"width": width, "height": height}
                     
             finally:

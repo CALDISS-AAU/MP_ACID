@@ -52,6 +52,7 @@ def _aggregate_framearrays(
     start_s,
     stop_s,
     dt, 
+    similarity_tolerance = 10
     ):
 
     aggregated_framearrays = []
@@ -63,7 +64,7 @@ def _aggregate_framearrays(
     representative_frame = framearrays[0][1]
 
     for timestamp_s, frame in framearrays[1:]:
-        if _frames_are_similar(representative_frame, frame):
+        if _frames_are_similar(representative_frame, frame, similarity_tolerance):
             continue
 
         interval_end = timestamp_s - dt

@@ -49,8 +49,8 @@ def _import_and_group_data(
             df.width,
         )
 
-        df = df.drop("Row", "Timestamp")
-        logger.debug("Dropped columns: Row, Timestamp")
+        df = df.drop("Row")
+        logger.debug("Dropped columns: Row")
 
         datasets = {
             "full": {
@@ -1224,6 +1224,506 @@ def _create_feeling_density_histogram(
     )
 
 
+def _estimate_ten_minute_feeling_density(
+    partition: pl.DataFrame,
+    logger: logging.Logger,
+    group: Any,
+    task: Any,
+) -> float:
+    """
+    Estimate the number of feeling events that would occur over 10 minutes.
+
+    For tasks shorter than 600,000 milliseconds, scale the observed
+    number of feeling events according to the task duration. Tasks lasting
+    at least 10 minutes retain their observed total.
+    """
+    ten_minutes_ms = 600_000.0
+
+    feeling_sums = partition.select(
+        pl.col(PLOT_FEELING_COLUMNS).sum()
+    ).row(0)
+
+    observed_feeling_events = sum(
+        int(value)
+        if value is not None
+        else 0
+        for value in feeling_sums
+    )
+
+    timestamps = (
+        partition.select(
+            pl.col("Timestamp")
+            .cast(pl.Float64, strict=False)
+            .drop_nulls()
+        )
+        .to_series()
+    )
+
+    if timestamps.is_empty():
+        logger.warning(
+            "No valid timestamps for group %s, task %s; "
+            "using the observed feeling total",
+            group,
+            task,
+        )
+        return float(observed_feeling_events)
+
+    first_timestamp = float(timestamps.min())
+    last_timestamp = float(timestamps.max())
+    duration_ms = last_timestamp - first_timestamp
+
+    if duration_ms <= 0:
+        logger.warning(
+            "Invalid duration of %.2f ms for group %s, task %s; "
+            "using the observed feeling total",
+            duration_ms,
+            group,
+            task,
+        )
+        return float(observed_feeling_events)
+
+    if duration_ms < ten_minutes_ms:
+        estimated_feeling_events = (
+            observed_feeling_events
+            * ten_minutes_ms
+            / duration_ms
+        )
+
+        logger.debug(
+            "Scaled group %s, task %s from %d events over %.2f ms "
+            "to %.2f estimated events over 10 minutes",
+            group,
+            task,
+            observed_feeling_events,
+            duration_ms,
+            estimated_feeling_events,
+        )
+
+        return estimated_feeling_events
+
+    return float(observed_feeling_events)
+
+
+def _create_ten_minute_feeling_density_histogram(
+    datasets: dict[str, dict[Any, pl.DataFrame]],
+    output_path: str,
+    logger: logging.Logger,
+) -> None:
+    """
+    Create a histogram of estimated feeling occurrences over 10 minutes.
+
+    For group-task pairs lasting less than 10 minutes, the observed
+    feeling total is scaled to estimate the number that would occur
+    over 600,000 milliseconds.
+
+    Group IDs beginning with A use shades of blue.
+    Group IDs beginning with C use shades of orange.
+    Each task uses a progressively darker shade.
+
+    A kernel density estimate shows the overall probability distribution.
+    A dotted vertical line marks where cumulative probability reaches 50%.
+    """
+    output_directory = Path(output_path)
+    plot_path = (
+        output_directory
+        / "ten_minute_feeling_density_histogram.html"
+    )
+
+    logger.info(
+        "Creating estimated 10-minute feeling-density histogram at %s",
+        plot_path,
+    )
+
+    try:
+        output_directory.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        partitions = datasets["by_group_and_task"]
+
+        if not partitions:
+            raise ValueError(
+                "The group-task dataset contains no partitions."
+            )
+
+        pair_data: list[dict[str, Any]] = []
+
+        # Calculate the estimated 10-minute feeling density for every
+        # group-task pair.
+        for (group, task), partition in partitions.items():
+            feeling_density = (
+                _estimate_ten_minute_feeling_density(
+                    partition=partition,
+                    logger=logger,
+                    group=group,
+                    task=task,
+                )
+            )
+
+            group_id = str(group)
+
+            if group_id.startswith("A"):
+                group_type = "Group A"
+            elif group_id.startswith("C"):
+                group_type = "Group C"
+            else:
+                group_type = "Other"
+
+            pair_data.append(
+                {
+                    "group": group_id,
+                    "task": task,
+                    "group_type": group_type,
+                    "feeling_density": feeling_density,
+                }
+            )
+
+        density_data = pl.DataFrame(pair_data)
+
+        # Sort tasks numerically when possible.
+        tasks = density_data["task"].unique().to_list()
+
+        try:
+            tasks = sorted(tasks, key=int)
+        except (TypeError, ValueError):
+            tasks = sorted(tasks, key=str)
+
+        # Lightest shade for the first task and darkest for the fourth.
+        blue_shades = [
+            "#BDD7EE",
+            "#6BAED6",
+            "#3182BD",
+            "#08519C",
+        ]
+
+        orange_shades = [
+            "#FDD0A2",
+            "#FDAE6B",
+            "#F16913",
+            "#A63603",
+        ]
+
+        grey_shades = [
+            "#D9D9D9",
+            "#BDBDBD",
+            "#969696",
+            "#636363",
+        ]
+
+        colour_sets = {
+            "Group A": blue_shades,
+            "Group C": orange_shades,
+            "Other": grey_shades,
+        }
+
+        # Histogram settings.
+        bin_size = 5.0
+        bin_start = -0.5
+
+        max_density = float(
+            density_data["feeling_density"].max() or 0.0
+        )
+
+        number_of_bins = (
+            int(
+                (max_density - bin_start)
+                // bin_size
+            )
+            + 1
+        )
+
+        bin_end = (
+            bin_start
+            + number_of_bins * bin_size
+        )
+
+        figure = go.Figure()
+
+        # Add one histogram trace for every group type and task.
+        for group_type, shades in colour_sets.items():
+            for task_index, task in enumerate(tasks):
+                trace_data = density_data.filter(
+                    (pl.col("group_type") == group_type)
+                    & (pl.col("task") == task)
+                )
+
+                if trace_data.is_empty():
+                    continue
+
+                colour = shades[
+                    task_index % len(shades)
+                ]
+
+                figure.add_trace(
+                    go.Histogram(
+                        name=f"{group_type} — Task {task}",
+                        x=trace_data[
+                            "feeling_density"
+                        ].to_list(),
+                        marker={
+                            "color": colour,
+                            "line": {
+                                "color": "#FFFFFF",
+                                "width": 0.5,
+                            },
+                        },
+                        opacity=1.0,
+                        bingroup="ten_minute_feeling_density",
+                        legendgroup=group_type,
+                        xbins={
+                            "start": bin_start,
+                            "end": bin_end,
+                            "size": bin_size,
+                        },
+                        hovertemplate=(
+                            f"<b>{group_type}</b><br>"
+                            f"Task: {task}<br>"
+                            "Estimated 10-minute density: %{x:.1f}<br>"
+                            "Group-task pairs: %{y:,}"
+                            "<extra></extra>"
+                        ),
+                    )
+                )
+
+        # Calculate the overall KDE, disregarding group ID and task.
+        density_values = np.asarray(
+            density_data["feeling_density"].to_list(),
+            dtype=float,
+        )
+
+        if len(density_values) > 1:
+            # Calculate the KDE in log space because the distribution
+            # is strongly right-skewed.
+            log_density_values = np.log1p(
+                density_values
+            )
+
+            number_of_observations = len(
+                log_density_values
+            )
+
+            log_standard_deviation = float(
+                np.std(
+                    log_density_values,
+                    ddof=1,
+                )
+            )
+
+            # Silverman's rule of thumb for KDE bandwidth.
+            kde_bandwidth = (
+                1.06
+                * log_standard_deviation
+                * number_of_observations ** (-1 / 5)
+            )
+
+            # Avoid a zero or extremely narrow bandwidth.
+            kde_bandwidth = max(
+                kde_bandwidth,
+                0.05,
+            )
+
+            # Increase for a smoother curve; decrease for more detail.
+            kde_smoothing = 1.0
+            kde_bandwidth *= kde_smoothing
+
+            kde_x = np.linspace(
+                0,
+                max(max_density, 1.0),
+                600,
+            )
+
+            kde_log_x = np.log1p(kde_x)
+
+            standardised_distances = (
+                kde_log_x[:, None]
+                - log_density_values[None, :]
+            ) / kde_bandwidth
+
+            kde_log_y = np.mean(
+                np.exp(
+                    -0.5
+                    * standardised_distances**2
+                )
+                / (
+                    kde_bandwidth
+                    * np.sqrt(2 * np.pi)
+                ),
+                axis=1,
+            )
+
+            # Transform the density back to the original scale.
+            kde_y = kde_log_y / (kde_x + 1)
+
+            # Normalize the displayed curve so its total area is 1.
+            interval_widths = np.diff(kde_x)
+
+            interval_areas = (
+                (kde_y[:-1] + kde_y[1:])
+                / 2
+                * interval_widths
+            )
+
+            total_area = float(
+                np.sum(interval_areas)
+            )
+
+            if total_area > 0:
+                kde_y = kde_y / total_area
+
+            # Calculate cumulative probability under the KDE.
+            normalized_interval_areas = (
+                (kde_y[:-1] + kde_y[1:])
+                / 2
+                * interval_widths
+            )
+
+            cumulative_probability = np.concatenate(
+                (
+                    [0.0],
+                    np.cumsum(
+                        normalized_interval_areas
+                    ),
+                )
+            )
+
+            median_density = float(
+                np.interp(
+                    0.5,
+                    cumulative_probability,
+                    kde_x,
+                )
+            )
+
+            # Draw the KDE after the histograms so it appears on top.
+            figure.add_trace(
+                go.Scatter(
+                    name="Overall likelihood",
+                    x=kde_x,
+                    y=kde_y,
+                    mode="lines",
+                    line={
+                        "color": "#222222",
+                        "width": 4,
+                        "shape": "spline",
+                    },
+                    yaxis="y2",
+                    legendgroup="Overall",
+                    hovertemplate=(
+                        "<b>Overall likelihood</b><br>"
+                        "Estimated 10-minute events: %{x:.1f}<br>"
+                        "Estimated probability density: %{y:.5f}"
+                        "<extra></extra>"
+                    ),
+                )
+            )
+
+            # Mark where cumulative probability reaches 50%.
+            figure.add_vline(
+                x=median_density,
+                line={
+                    "color": "#222222",
+                    "width": 2,
+                    "dash": "dot",
+                },
+                annotation={
+                    "text": (
+                        "50% below "
+                        f"{median_density:.0f} events"
+                    ),
+                    "showarrow": False,
+                    "textangle": -90,
+                    "xanchor": "right",
+                    "yanchor": "top",
+                    "bgcolor": "rgba(255, 255, 255, 0.85)",
+                    "bordercolor": "#222222",
+                    "borderwidth": 1,
+                    "borderpad": 4,
+                },
+                annotation_position="top right",
+            )
+
+        figure.update_layout(
+            title={
+                "text": (
+                    "Estimated 10-minute distribution of feeling "
+                    "occurrences across group-task pairs"
+                ),
+                "x": 0.5,
+                "xanchor": "center",
+            },
+            autosize=True,
+            height=700,
+            barmode="stack",
+            bargap=0.05,
+            xaxis={
+                "title": (
+                    "Estimated feeling occurrences over 10 minutes"
+                ),
+                "rangemode": "tozero",
+                "tickmode": "auto",
+                "gridcolor": "#EEEEEE",
+            },
+            yaxis={
+                "title": "Number of group-task pairs",
+                "rangemode": "tozero",
+                "dtick": 1,
+                "gridcolor": "#D9D9D9",
+            },
+            yaxis2={
+                "title": "Estimated probability density",
+                "overlaying": "y",
+                "side": "right",
+                "rangemode": "tozero",
+                "showgrid": False,
+                "tickformat": ".4f",
+            },
+            legend={
+                "title": {
+                    "text": "Group prefix and task",
+                },
+                "orientation": "h",
+                "yanchor": "top",
+                "y": -0.18,
+                "xanchor": "center",
+                "x": 0.5,
+            },
+            margin={
+                "l": 90,
+                "r": 110,
+                "t": 100,
+                "b": 210,
+            },
+            plot_bgcolor="#FFFFFF",
+            paper_bgcolor="#FFFFFF",
+            font={
+                "family": "Arial",
+                "size": 13,
+            },
+            hovermode="closest",
+        )
+
+        figure.write_html(
+            plot_path,
+            include_plotlyjs=True,
+            full_html=True,
+            config={
+                "responsive": True,
+                "displaylogo": False,
+            },
+        )
+
+    except Exception:
+        logger.exception(
+            "Failed to create estimated 10-minute histogram at %s",
+            plot_path,
+        )
+        raise
+
+    logger.info(
+        "Created estimated 10-minute histogram at %s",
+        plot_path,
+    )
 
 
 ## MAIN FUNCTIONALITY ##
@@ -1251,6 +1751,12 @@ def generate_plots(
     )
 
     _create_feeling_density_histogram(
+        datasets=datasets,
+        output_path=output_path,
+        logger=logger,
+    )
+
+    _create_ten_minute_feeling_density_histogram(
         datasets=datasets,
         output_path=output_path,
         logger=logger,

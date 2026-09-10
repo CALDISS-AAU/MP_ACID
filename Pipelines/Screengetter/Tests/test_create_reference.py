@@ -14,6 +14,27 @@ from Pipelines.Screengetter.Functions.create_reference import create_reference
 
 
 class TestCreateReference(unittest.TestCase):
+    def setUp(self):
+        # Keep video integration tests offline and independent of model weights.
+        extensions = patch(
+            "Pipelines.Screengetter.Functions.create_reference.VIDEO_EXTENSIONS",
+            {".avi"}
+        )
+        extensions.start()
+        self.addCleanup(extensions.stop)
+        def category(frame):
+            if np.all(frame == 255):
+                return "white"
+            if np.all(frame[:, :, 2] == 255) and np.all(frame[:, :, :2] == 0):
+                return "red"
+            return "dark"
+        model = patch(
+            "Pipelines.Screengetter.Functions.create_reference.not_similar",
+            side_effect=lambda frame, retained, threshold: category(frame) != category(retained)
+        )
+        self.compare = model.start()
+        self.addCleanup(model.stop)
+
     def _write_video(self, path, samples):
         height, width = samples[0].shape[:2]
         writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"FFV1"), 1, (width, height))
@@ -52,11 +73,11 @@ class TestCreateReference(unittest.TestCase):
 
             self.assertEqual(
                 [(entry["source_video"], entry["timestamp_s"]) for entry in lookup],
-                [("a.avi", 0), ("a.avi", 10), ("a.avi", 15), ("a.avi", 20), ("b.AVI", 0)]
+                [("a.avi", 0), ("a.avi", 10), ("a.avi", 15)]
             )
             self.assertEqual(json.loads((output_dir / "reference_lookup.json").read_text()), lookup)
-            self.assertEqual(len(list(output_dir.glob("*.png"))), 5)
-            self.assertEqual(len(list(output_dir.glob("*.npy"))), 5)
+            self.assertEqual(len(list(output_dir.glob("*.png"))), 3)
+            self.assertEqual(len(list(output_dir.glob("*.npy"))), 3)
             for entry in lookup:
                 array = np.load(output_dir / entry["npy_path"], allow_pickle=False)
                 image = cv2.imread(str(output_dir / entry["png_path"]))
@@ -84,8 +105,8 @@ class TestCreateReference(unittest.TestCase):
 
             lookup = create_reference(root, root / "output")
 
-            # Neither an identical frame nor exactly 50% change is retained,
-            # including the first sample of a later video.
+            # Perceptually similar frames veto retention across video boundaries,
+            # even when the underlying pixels differ.
             self.assertEqual(
                 [(entry["source_video"], entry["timestamp_s"]) for entry in lookup],
                 [("a.avi", 0)]

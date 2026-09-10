@@ -12,23 +12,26 @@ from pathlib import Path
 import numpy as np
 
 # Internal
-#from Shared_Functions.logger_functionality import *
+from Shared_Functions.logger_functionality import *
 from .Functions.create_reference import create_reference
 from .Functions.arrays_from_frames import extract_framearrays
+from .Functions.event_loader import load_events
+from .Functions.annotate_frames import annotate_frames_in_intervals
 
 ## _______ ##
 
 
 ## STATIC VARIABLES ##
 # Directories - input
-#INPUT_DIR_RAW = Path("..") / "main_Data" / "raw" / "iMotions"
-INPUT_DIR_RAW = Path(".") / "Data" / "raw" / "iMotions"
+INPUT_DIR_DATA = Path(".") / "Data"
+INPUT_DIR_RAW = INPUT_DIR_DATA / "raw" / "iMotions"
 INPUT_DIR_SCREENRECS = INPUT_DIR_RAW / "ScreenRecordings_PRIMO"
+INPUT_EVENTS_PATH = INPUT_DIR_DATA / "Data_Combination" / "combined_data_when_feelings_pc85_pre0_post0.csv"
 
 # Directories - internal output
 OUTPUT_DIR_INT = Path(".") / "Pipelines" / "Screengetter" / "Data"
 OUTPUT_FRAMEARRAYS = OUTPUT_DIR_INT / "Framearrays"
-OUTPUT_REFERENCE = OUTPUT_DIR_INT / "Reference"
+OUTPUT_REFERENCE = OUTPUT_DIR_INT / "Reference2"
 
 # Directories - global output
 OUTPUT_BASE = Path(".") / "Data" / "Screengetter"
@@ -39,11 +42,14 @@ OUTPUT_DIR_LOG_FULL_PIPELINE = OUTPUT_DIR_LOGS / "full_pipeline.log"
 OUTPUT_DIR_LOG_1 = OUTPUT_DIR_LOGS / "example_1.log"
 
 # Resources
-VIDEO_RESOLUTIONS = OUTPUT_DIR_INT / "resolutions.json"
+VIDEO_RESOLUTIONS = OUTPUT_REFERENCE / "resolutions.json"
+REFERENCE_SET = OUTPUT_REFERENCE / "reference_lookup_tagged.json"
 
 # Filename schema
 SCREENREC_FILE_SCHEMA = r"Scene_{GROUP}_{TASK}.PRIMO-RA"
 
+# SEED
+SEED_NO = 1789021234
 
 ## MOCK DATA ##
 event_timestamps = {
@@ -57,6 +63,18 @@ event_timestamps = {
 }
 
 ## HELPER FUNCTIONS ##
+def _read_smallest_resolution(
+    input_path = VIDEO_RESOLUTIONS
+):
+    with open(input_path, "r", encoding="utf-8") as f:
+        resolutions = json.load(f)
+
+    smallest = min(resolutions, key=lambda r: r["total"])
+
+    smallest_resolution = {"width": smallest["width"], "height": smallest["height"]}
+
+    return smallest_resolution
+
 def _get_filename(
     group_name,
     task,
@@ -112,47 +130,77 @@ def _store_framearrays(
     
 
 ## MAIN FUNCTION ##
-def main(input_data = event_timestamps) -> None:
+def main(input_data = None) -> None:
     """Run the full Screengetter pipeline."""
 
-    reference_lookup = create_reference(
-        input_dir = INPUT_DIR_SCREENRECS,
-        output_dir = OUTPUT_REFERENCE
-    )
-    smallest_resolution = {
-        "width": reference_lookup[0]["width"],
-        "height": reference_lookup[0]["height"]
-    }
+    logger = setup_logger(
+            output_dir_log=OUTPUT_DIR_LOG_FULL_PIPELINE,
+            logger_name="Pipelines.Screengetter",
+        )
+    for handler in logger.handlers:
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+        )
 
-    #group = input_data.get("group")
-    #task = input_data.get("task")
-    #event_ranges = input_data.get("event_ranges")
-#
-    #screenrec_filepath = _get_filename(group, task)
-    #
-    #framearrays_in_intervals = extract_framearrays(
-    #    screenrec_filepath,
-    #    event_ranges,
-    #    freq_per_s = 1,
-    #    standardize_resolution = True,
-    #    use_resolution = smallest_resolution
-    #)
-#
-    #_store_framearrays(
-    #    framearrays_in_intervals, 
-    #    group, 
-    #    task
-    #)
+    if not REFERENCE_SET.is_file():
+        logger.info(f"No reference set found at path {REFERENCE_SET}. New reference set to be created at dir {OUTPUT_REFERENCE}.")
+        create_reference(
+            input_dir = INPUT_DIR_SCREENRECS,
+            output_dir = OUTPUT_REFERENCE,
+            seed_use = SEED_NO
+        )
+        logger.info(f"New reference set created at {OUTPUT_REFERENCE}. Please provide manual annotations of the reference images using the JSON key 'tag': >tag< and store at path {REFERENCE_SET}. Then re-run the workflow.")
+        
+        return
+
+    smallest_resolution = _read_smallest_resolution(VIDEO_RESOLUTIONS)
+    reference_lookup = json.load(reference_lookup)
+
+    if input_data is None:
+        events_df = load_events(input_file = INPUT_EVENTS_PATH)
+
+    group_tasks = zip(events_df.col("group"), events_df.col("task"))
+
+    for group, task in group_tasks.items():
+
+        screenrec_filepath = _get_filename(group, task)
+
+        event_timestamps_group_task = events_df.filter(
+            events_df.col("group") == group & 
+            events_df.col("task") == task
+        ).get_column("feeling_timestamp").to_list()
+
+        framearrays_in_intervals = extract_framearrays(
+            screenrec_filepath,
+            event_timestamps_group_task,
+            freq_per_s = 1,
+            standardize_resolution = False
+        )
+
+        frames_annotated = annotate_frames_in_intervals(
+            framearrays_in_intervals,
+            reference_dir = OUTPUT_REFERENCE,
+            reference_set = REFERENCE_SET
+        )
+
+        # TODO: Store framearrays + dataset of event, start, end, framepath, tag
+
+        #_store_framearrays(
+        #    framearrays_in_intervals, 
+        #    group, 
+        #    task
+        #)
+
+        # TODO: Analyze tag function: last tag, change in tag
+
+        # TODO: Disregard last tag == unknown (or all tags unknown?)
+
+        # TODO: Output: Similar output as other pipeline - distribution of UI tags
 
 
     
-    #rebuild_pipeline_log(
-    #    step_log_paths=[
-    #        OUTPUT_DIR_LOG_1,
-    #        OUTPUT_DIR_LOG_2,
-    #    ],
-    #    output_dir_log=OUTPUT_DIR_LOG_FULL_PIPELINE,
-    #)
+    
+
 
 
 ## CALL OF MAIN FUNCTION ##

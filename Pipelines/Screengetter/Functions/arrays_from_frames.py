@@ -7,8 +7,12 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from .frame_similarity import frames_are_similar, frames_are_not_similar
+
 ## _______ ##
 
+## LOGGER ## 
+logger = logging.getLogger(__name__)
 
 ## HELPER FUNCTIONS ##
 def _frames_are_similar(frame1, frame2, tolerance_pct = 10):
@@ -21,6 +25,7 @@ def _frames_are_similar(frame1, frame2, tolerance_pct = 10):
     below_tolerance = diff_pct < tolerance_pct
 
     return below_tolerance
+
 
 def iter_framearrays(
     cap,
@@ -63,12 +68,13 @@ def _get_framearrays_from_interval(
 ):
     return list(iter_framearrays(cap, start_s, stop_s, dt, use_resolution))
 
+
 def _aggregate_framearrays(
     framearrays,
     start_s,
     stop_s,
     dt, 
-    similarity_tolerance = 10
+    similarity_tolerance = 0.1
     ):
 
     aggregated_framearrays = []
@@ -80,7 +86,7 @@ def _aggregate_framearrays(
     representative_frame = framearrays[0][1]
 
     for timestamp_s, frame in framearrays[1:]:
-        if _frames_are_similar(representative_frame, frame, similarity_tolerance):
+        if frames_are_similar(representative_frame, frame, similarity_tolerance):
             continue
 
         interval_end = timestamp_s - dt
@@ -102,8 +108,10 @@ def _aggregate_framearrays(
 
 def extract_framearrays(
     screenrec_filepath: Path,
-    time_intervals: list[range],
+    timestamps: list[int],
     freq_per_s: int = 1,
+    buffer_ms: int  = 500,
+    context_include_ms: int = 5000,
     standardize_resolution = False,
     use_resolution: dict | None = None
 ) -> list[tuple]:
@@ -115,12 +123,17 @@ def extract_framearrays(
     screenrec_filepath:
         Path to the video file.
 
-    time_intervals:
-        List of time interval ranges in seconds. For example, range(10, 20) extracts
-        frames from 10.0 seconds up to (but not including) 20.0 seconds.
+    timestamps:
+        List of timestamps in ms.
 
     freq_per_s:
         Number of frames to extract per second.
+
+    buffer_ms:
+        Buffer in ms between last extracted frames and timestamp (default: 500)
+
+    context_include_ms:
+        How much context prior to timestamp-buff_ms to include in ms (default: 5000; 5 seconds)
 
     standardize_resolution:
         Whether to resize frame to specified resolution (requires use_resolution).
@@ -149,6 +162,10 @@ def extract_framearrays(
     fps = cap.get(cv2.CAP_PROP_FPS)
     frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     duration_s = frame_count / fps
+
+    time_intervals = [
+        range(timestamp-buffer_ms-context_include_ms, timestamp-buffer_ms) for timestamp in timestamps
+    ]
 
     framearrays_in_intervals = []
 

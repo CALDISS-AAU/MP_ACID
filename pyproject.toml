@@ -12,6 +12,8 @@ dependencies = [
     "pillow>=12.3.0",
     "plotly>=6.9.0",
     "polars>=1.43.1",
+    "torch>=2.2",
+    "lpips>=0.1.4,<0.2",
 ]
 
 [project.scripts]

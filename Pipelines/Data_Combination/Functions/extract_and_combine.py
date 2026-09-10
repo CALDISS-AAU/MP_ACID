@@ -37,8 +37,20 @@ def _extract_feeling_timestamps(
 def _extract_matching_transcriptions(
     transcription_data: pl.DataFrame,
     events: pl.DataFrame,
+    number_of_predecending_sentences: int,
+    number_of_postdecending_sentences: int,
     logger: logging.Logger,
 ) -> pl.DataFrame:
+    if number_of_predecending_sentences < 0:
+        raise ValueError(
+            "number_of_predecending_sentences must be non-negative"
+        )
+
+    if number_of_postdecending_sentences < 0:
+        raise ValueError(
+            "number_of_postdecending_sentences must be non-negative"
+        )
+
     transcriptions = transcription_data.sort(
         ["group", "task", "start"]
     )
@@ -72,6 +84,10 @@ def _extract_matching_transcriptions(
 
         current = rows[index]
 
+        # These indices describe the rows included in transcription_text.
+        relevant_start_index = index
+        relevant_end_index = index
+
         # Timestamp is inside the current sentence.
         if timestamp <= current["end"]:
             transcription_start = current["start"]
@@ -88,6 +104,7 @@ def _extract_matching_transcriptions(
                 transcription_text = (
                     f"{current['text']} {following['text']}"
                 )
+                relevant_end_index = index + 1
             else:
                 continue
         else:
@@ -106,6 +123,25 @@ def _extract_matching_transcriptions(
 
         added_intervals.add(interval_key)
 
+        extended_start_index = max(
+            0,
+            relevant_start_index
+            - number_of_predecending_sentences,
+        )
+        extended_end_index = min(
+            len(rows),
+            relevant_end_index
+            + number_of_postdecending_sentences
+            + 1,
+        )
+
+        transcription_text_extended = " ".join(
+            row["text"]
+            for row in rows[
+                extended_start_index:extended_end_index
+            ]
+        )
+
         final_data.append({
             "group": event["group"],
             "task": event["task"],
@@ -113,11 +149,15 @@ def _extract_matching_transcriptions(
             "transcription_start": transcription_start,
             "transcription_end": transcription_end,
             "transcription_text": transcription_text,
+            "text_extended": transcription_text_extended,
         })
 
     result = pl.DataFrame(final_data)
 
-    logger.info("Extracted %d transcription intervals", result.height)
+    logger.info(
+        "Extracted %d transcription intervals",
+        result.height,
+    )
     return result
 
 
@@ -302,6 +342,8 @@ def extract_and_combine(
     input_dir_mouse_data: str,
     output_path_base: str,
     relevant_feelings: list[str],
+    number_of_predecending_sentences:int,
+    number_of_postdecending_sentences: int,
     logger: logging.Logger,
 ) -> None:
     feelings_data = pl.read_csv(input_dir_fea_data)
@@ -317,6 +359,8 @@ def extract_and_combine(
     final_data = _extract_matching_transcriptions(
         transcription_data=transcription_data,
         events=events,
+        number_of_predecending_sentences=number_of_predecending_sentences,
+        number_of_postdecending_sentences=number_of_postdecending_sentences, 
         logger=logger,
     )
 

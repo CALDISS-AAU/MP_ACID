@@ -1,27 +1,20 @@
 """Analyze tagged frames using their JSON metadata."""
 
+## IMPORTS ##
 from pathlib import Path
 import logging
 
 import plotly.express as px
 import polars as pl
 
+## LOGGER ## 
 logger = logging.getLogger(__name__)
 
-
-def analyze_frames(
-    framearrays_dir: Path,
-    tagged_events_path: Path,
-) -> None:
-    """Write total and per-task trajectory charts alongside the frame arrays.
-
-    Each feeling event contributes once. Tags follow frame-start order, and
-    events containing only unknown tags are excluded. Frame arrays are not read.
-    """
-    frames = pl.read_json(tagged_events_path)
-    if frames.is_empty():
-        logger.info("No tagged frames to analyze in %s", tagged_events_path)
-        return
+## HELPER FUNCTIONS ##
+def _count_frame_tags(
+    frames: pl.DataFrame
+    ):
+    """Aggregate annotated data into counted tag trajectories. One DataFrame for total and one stratified by task."""
 
     event_keys = ["group", "task", "feeling_timestamp"]
     frames = frames.sort([*event_keys, "frame_start"], maintain_order=True)
@@ -41,7 +34,16 @@ def analyze_frames(
         ["task", "count", "tag_trajectory"], descending=[False, True, False]
     )
 
-    labels = {"tag_trajectory": "Tag trajectory", "count": "Feeling events", "task": "Task"}
+    return total_counts, task_counts
+
+def _plot_counts(
+    total_counts: pl.DataFrame,
+    task_counts: pl.DataFrame
+    ):
+    """Plot tag trajectories for total count and task count as separate plotly bar charts"""
+    
+    labels = {"tag_trajectory": "Tag trajectory", "count": "Events", "task": "Task"}
+    
     total_chart = px.bar(
         total_counts,
         x="tag_trajectory",
@@ -49,6 +51,7 @@ def analyze_frames(
         labels=labels,
         title="Tag trajectories across all tasks",
     )
+    
     task_chart = px.bar(
         task_counts,
         x="tag_trajectory",
@@ -59,13 +62,45 @@ def analyze_frames(
         title="Tag trajectories by task",
     )
 
-    output_dir = Path(framearrays_dir)
+    return total_chart, task_chart
+
+def _store_plots(
+    total_chart: px.bar,
+    task_chart: px.bar,
+    output_dir: Path
+    ):
+    """Store bar charts as HTML"""
+
     output_dir.mkdir(parents=True, exist_ok=True)
+
     for chart, filename in (
         (total_chart, "tag_trajectories_total.html"),
         (task_chart, "tag_trajectories_by_task.html"),
-    ):
+        ):
+
         chart.update_yaxes(dtick=1)
         output_path = output_dir / filename
+
         chart.write_html(output_path, include_plotlyjs=True, full_html=True)
-        logger.info("Saved tag trajectory chart to %s", output_path)
+        
+        logger.info("Saved tagged event plot to %s", output_path)
+
+
+## MAIN FUNCTIONS ##
+def analyze_frames(
+    framearrays_dir: Path,
+    tagged_events_path: Path,
+    output_dir: Path
+) -> None:
+    """Write total and per-task trajectory charts alongside the frame arrays.
+
+    Each feeling event contributes once. Tags follow frame-start order.
+    """
+
+    frames = pl.read_json(tagged_events_path)
+
+    total_counts, task_counts = _count_frame_tags(frames)
+
+    total_chart, task_chart = _plot_counts(total_counts, task_counts)
+
+    _store_plots(total_chart, task_chart, output_dir)

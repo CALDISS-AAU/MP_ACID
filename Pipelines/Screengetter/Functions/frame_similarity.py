@@ -3,11 +3,15 @@
 ## IMPORTS ##
 from functools import lru_cache
 from math import isfinite
+import logging
 
 import cv2
 import numpy as np
 
+## LOGGER ## 
+logger = logging.getLogger(__name__)
 
+## HELPER FUNCTIONS ##
 @lru_cache(maxsize=1)
 def _load_model():
     # Load weights only when a comparison is needed.
@@ -26,6 +30,7 @@ def _prepare_frame(frame: np.ndarray) -> np.ndarray:
     return np.ascontiguousarray(normalized.transpose(2, 0, 1)[None])
 
 
+## MAIN FUNCTIONALITY ##
 def frame_distance(
     frame: np.ndarray,
     reference_frame: np.ndarray

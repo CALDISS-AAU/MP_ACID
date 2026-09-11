@@ -19,6 +19,7 @@ from .Functions.arrays_from_frames import extract_framearrays
 from .Functions.event_loader import load_events
 from .Functions.annotate_frames import annotate_frames_in_intervals
 from .Functions.analyze_frames import analyze_frames
+from .Functions.process_events import process_event_data
 
 ## _______ ##
 
@@ -48,27 +49,16 @@ OUTPUT_DIR_LOG_1 = OUTPUT_DIR_LOGS / "example_1.log"
 VIDEO_RESOLUTIONS = OUTPUT_REFERENCE / "resolutions.json"
 REFERENCE_SET = OUTPUT_REFERENCE / "reference_lookup_tagged.json"
 
-# Filename schema
-SCREENREC_FILE_SCHEMA = r"Scene_{GROUP}_{TASK}.PRIMO[-_]RA"
-
 # SEED
 SEED_NO = 1789021234
 
-## MOCK DATA ##
-event_timestamps = {
-    "group": "C4",
-    "task": "11",
-    "event_ranges": [
-        range(115000, 120000),
-        range(220000, 230000),
-        range(470000, 477000)
-    ]
-}
 
 ## HELPER FUNCTIONS ##
 def _read_smallest_resolution(
     input_path = VIDEO_RESOLUTIONS
-):
+    ):
+    """Reads the smallest resolution from the reference material. Used to standardize resolution between input and reference data"""
+    
     with open(input_path, "r", encoding="utf-8") as f:
         resolutions = json.load(f)
 
@@ -78,53 +68,11 @@ def _read_smallest_resolution(
 
     return smallest_resolution
 
-def _get_filename(
-    group_name,
-    task,
-    screenrecs_dir: Path = INPUT_DIR_SCREENRECS,
-    filename_schema = SCREENREC_FILE_SCHEMA
-):
-    """Determine filename of screenrecording based on group and task name"""
-
-    filename_stub = filename_schema.format(
-        GROUP = group_name,
-        TASK = f"{int(task):02d}"
-    )
-    screenrec_filepath = next(screenrecs_dir.glob(f"{filename_stub}*"), None)
-
-    return screenrec_filepath, filename_stub
-
-def _combine_entries(group, task, event_timestamps, annotated_frames):
-
-    entries = []
-    timestamps_failed = 0
-
-    for timestamp, frame_data in dict(zip(event_timestamps, annotated_frames)).items():
-
-        n_frames_failed = sum([frame is None for start, end, frame, tag in frame_data])
-        all_failed = int((n_frames_failed / len(frame_data)) == 1)
-        
-        for start, end, frame, tag in frame_data:
-            combined_entry = {
-                "group": group,
-                "task": task, 
-                "feeling_timestamp": timestamp,
-                "frame_start": start, 
-                "frame_end": end, 
-                "frame": frame,
-                "tag": tag
-            }
-        
-        entries.append(combined_entry)
-        timestamps_failed += all_failed
-    
-    return entries, timestamps_failed
-
-
 def _store_framearrays(
     processed_events: list[dict],
     output_frames_dir: Path = OUTPUT_FRAMEARRAYS
     ):
+    """Stores frames of processed events as numpy arrays. A json with metadata for all events are created with path for each .npy file stored"""
 
     output_path_meta = output_frames_dir / "event_frames_meta.json"
 
@@ -149,7 +97,7 @@ def _store_framearrays(
     return output_path_meta
 
 ## MAIN FUNCTION ##
-def main(input_data = None) -> None:
+def main() -> None:
     """Run the full Screengetter pipeline."""
 
     logger = setup_logger(
@@ -174,66 +122,15 @@ def main(input_data = None) -> None:
 
     smallest_resolution = _read_smallest_resolution(VIDEO_RESOLUTIONS)
     
-    if input_data is None:
-        events_df = load_events(input_file = INPUT_EVENTS_PATH)
+    events_df = load_events(input_file = INPUT_EVENTS_PATH)
 
-    group_tasks = dict(events_df.select("group", "task").iter_rows())
-    
-    processed_events = []
-    events_failed = 0
-
-    for group, task in group_tasks.items():
-
-        logger.info(f"Processing events for {group}-{task}")
-
-        try:
-
-            screenrec_filepath, filename_lookup = _get_filename(group, task)
-
-            if not screenrec_filepath:
-                logger.error(f"Failed to find video for {group}-{task}. Expected filename to match: {filename_lookup}")
-                continue
-
-            logger.info(f"Recording found at {screenrec_filepath}")
-
-            event_timestamps_group_task = events_df.filter(
-                (pl.col("group") == group) & 
-                (pl.col("task") == task)
-            ).get_column("feeling_timestamp").to_list()
-
-            if len(event_timestamps_group_task) == 0:
-                logging.warning(f"No events found for {group}-{task}. Continuing...")
-                continue
-
-            logger.info(f"{len(event_timestamps_group_task)} events loaded for file {screenrec_filepath}")
-
-            framearrays_in_intervals = extract_framearrays(
-                screenrec_filepath,
-                event_timestamps_group_task,
-                freq_per_s = 1,
-                standardize_resolution = False
-            )
-
-            logger.info("Framearrays extracted")
-
-            frames_annotated = annotate_frames_in_intervals(
-                framearrays_in_intervals,
-                reference_dir = OUTPUT_REFERENCE,
-                reference_set = REFERENCE_SET,
-                use_resolution = smallest_resolution
-            )
-
-            logger.info("Framearraays annotated")
-
-            combined_entries, group_task_events_failed = _combine_entries(group, task, event_timestamps_group_task, frames_annotated)
-
-            logger.info(f"Processed {len(combined_entries)} frames for {group}-{task}")
-
-            processed_events.extend(combined_entries)
-            events_failed += group_task_events_failed
-
-        except Exception as e:
-            logger.error(f"Processing failed for {group}-{task} with error: \n {e}")
+    processed_events, events_failed = process_event_data(
+        events_df,
+        smallest_resolution,
+        screenrecs_dir=INPUT_DIR_SCREENRECS,
+        reference_dir=OUTPUT_REFERENCE,
+        reference_set=REFERENCE_SET
+    )
 
     logger.info(f"Storing {len(processed_events)-events_failed} tagged events to {OUTPUT_FRAMEARRAYS}. {events_failed} failed.")
 

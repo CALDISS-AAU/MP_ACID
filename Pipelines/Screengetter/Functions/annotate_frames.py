@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 def _load_references(
     reference_dir: Path,
     reference_set: Path):
+    """
+    Loads and prepares the reference set
+    """
 
     with open(reference_set, "r") as f:
         reference_lookup = json.load(f)
@@ -49,6 +52,10 @@ def annotate_frame(
     acceptance_threshold: float = 0.5,
     use_resolution: dict | None = None
     ):
+    """
+    Annotate single frame using reference set based on LPIPS distance to frame in reference set. 
+    If frame differs too much from any frame in the reference set, the frame is tagged as 'unknown'
+    """
 
     if frame is None:
         return "No frame available"
@@ -85,6 +92,10 @@ def annotate_frames_in_intervals(
     acceptance_threshold: float = 0.5,
     use_resolution: dict | None = None
     ):
+    """
+    Annotate frames using reference set. Each interval of frame associated with an event is tagged based on LPIPS distance to frame in reference set. 
+    If frame differs too much from any frame in the reference set, the frame is tagged as 'unknown'
+    """
 
     frames_annotated = []
 

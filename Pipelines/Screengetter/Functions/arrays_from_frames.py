@@ -22,7 +22,9 @@ def _get_framearrays_from_interval(
     stop_s,
     dt,
     use_resolution: dict | None = None
-):
+    ):
+    """Wrapper for iter_framearrays to return list instead of generator"""
+
     return list(iter_framearrays(cap, start_s, stop_s, dt, use_resolution))
 
 
@@ -33,6 +35,7 @@ def _aggregate_framearrays(
     dt, 
     similarity_tolerance = 0.1
     ):
+    """Aggregate frames to intervals based on frame similarity (LPIPS distance). If distance between frames are below similarity_tolerance, frames are assumed to be part of the same view."""
 
     aggregated_framearrays = []
 

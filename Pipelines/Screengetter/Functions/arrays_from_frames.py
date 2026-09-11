@@ -1,6 +1,7 @@
 """Extract screenshots from screenrecordings"""
 
 ## IMPORTS ##
+from torch import max_pool2d
 import logging
 from pathlib import Path
 
@@ -26,39 +27,6 @@ def _frames_are_similar(frame1, frame2, tolerance_pct = 10):
 
     return below_tolerance
 
-
-def iter_framearrays(
-    cap,
-    start_s,
-    stop_s,
-    dt,
-    use_resolution: dict | None = None
-):
-    """Yield (timestamp_seconds, BGR array) samples, optionally resized."""
-
-    if dt <= 0:
-        raise ValueError("Frame sampling interval must be positive")
-
-    timestamp_s = float(start_s)
-
-    while timestamp_s < stop_s:
-        cap.set(cv2.CAP_PROP_POS_MSEC, timestamp_s * 1000)
-        success, frame = cap.read()
-
-        if not success:
-            break
-
-        if use_resolution is not None:
-            frame = cv2.resize(
-                frame,
-                (use_resolution["width"], use_resolution["height"]),
-                interpolation = cv2.INTER_AREA
-            )
-
-        yield timestamp_s, frame
-        timestamp_s += dt
-
-
 def _get_framearrays_from_interval(
     cap,
     start_s,
@@ -80,8 +48,9 @@ def _aggregate_framearrays(
     aggregated_framearrays = []
 
     if not framearrays:
-        raise ValueError("List of framearrays is empty. Nothing to aggregate")
-    
+        logger.warning(f"List of framearrays from start {start_s} is empty. Nothing to aggregate")
+        return []
+        
     interval_start = framearrays[0][0]
     representative_frame = framearrays[0][1]
 
@@ -105,6 +74,38 @@ def _aggregate_framearrays(
 
 
 ## MAIN FUNCTIONALITY ##
+def iter_framearrays(
+    cap,
+    start_s,
+    stop_s,
+    dt,
+    use_resolution: dict | None = None
+):
+    """Yield (timestamp_seconds, BGR array) samples, optionally resized."""
+
+    if dt <= 0:
+        raise ValueError("Frame sampling interval must be positive")
+
+    timestamp_s = float(start_s)
+
+    while timestamp_s < stop_s:
+        cap.set(cv2.CAP_PROP_POS_MSEC, timestamp_s * 1000)
+        success, frame = cap.read()
+
+        if not success:
+            logger.warning(f"Failed to load frame at {start_s}")
+            break
+
+        if use_resolution is not None:
+            frame = cv2.resize(
+                frame,
+                (use_resolution["width"], use_resolution["height"]),
+                interpolation = cv2.INTER_AREA
+            )
+
+        yield timestamp_s, frame
+        timestamp_s += dt
+
 
 def extract_framearrays(
     screenrec_filepath: Path,
@@ -163,8 +164,10 @@ def extract_framearrays(
     frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     duration_s = frame_count / fps
 
+    logging.info(f"estimated duration: {duration_s}")
+
     time_intervals = [
-        range(timestamp-buffer_ms-context_include_ms, timestamp-buffer_ms) for timestamp in timestamps
+        range(max(timestamp-buffer_ms-context_include_ms, 0), max(timestamp-buffer_ms, 0)) for timestamp in timestamps
     ]
 
     framearrays_in_intervals = []

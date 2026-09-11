@@ -37,6 +37,7 @@ OUTPUT_REFERENCE = OUTPUT_DIR_INT / "Reference"
 
 # Directories - global output
 OUTPUT_BASE = Path(".") / "Data" / "Screengetter"
+OUTPUT_RESULTS = Path(".") / "Output/" / "Screengetter"
 
 # Directories - logs
 OUTPUT_DIR_LOGS = Path(".") / "Pipelines" / "Screengetter" / "Logs"
@@ -248,7 +249,8 @@ def main(input_data = None) -> None:
 
     analyze_frames(
         OUTPUT_FRAMEARRAYS,
-        output_path_meta
+        output_path_meta,
+        OUTPUT_RESULTS
     )
 
 

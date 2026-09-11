@@ -18,6 +18,7 @@ from .Functions.create_reference import create_reference
 from .Functions.arrays_from_frames import extract_framearrays
 from .Functions.event_loader import load_events
 from .Functions.annotate_frames import annotate_frames_in_intervals
+from .Functions.analyze_frames import analyze_frames
 
 ## _______ ##
 
@@ -90,14 +91,18 @@ def _get_filename(
     )
     screenrec_filepath = next(screenrecs_dir.glob(f"{filename_stub}*"), None)
 
-    return screenrec_filepath
+    return screenrec_filepath, filename_stub
 
 def _combine_entries(group, task, event_timestamps, annotated_frames):
 
     entries = []
+    timestamps_failed = 0
 
     for timestamp, frame_data in dict(zip(event_timestamps, annotated_frames)).items():
 
+        n_frames_failed = sum([frame is None for start, end, frame, tag in frame_data])
+        all_failed = int((n_frames_failed / len(frame_data)) == 1)
+        
         for start, end, frame, tag in frame_data:
             combined_entry = {
                 "group": group,
@@ -110,8 +115,9 @@ def _combine_entries(group, task, event_timestamps, annotated_frames):
             }
         
         entries.append(combined_entry)
+        timestamps_failed += all_failed
     
-    return entries
+    return entries, timestamps_failed
 
 
 def _store_framearrays(
@@ -125,18 +131,21 @@ def _store_framearrays(
         
         frame = event_dict.pop("frame")
 
-        frame_arary_output_name = f'{event_dict["group"]}-{event_dict["task"]}_{event_dict["frame_start"]}-{event_dict["frame_end"]}.npy'
-        frame_arary_output_path = output_frames_dir / frame_arary_output_name
+        if frame is not None:
 
-        np.save(frame_arary_output_path, frame)
+            frame_arary_output_name = f'{event_dict["group"]}-{event_dict["task"]}_{event_dict["frame_start"]}-{event_dict["frame_end"]}.npy'
+            frame_arary_output_path = output_frames_dir / frame_arary_output_name
 
-        event_dict.update({
-            "framearray_path": frame_arary_output_name
-        })
+            np.save(frame_arary_output_path, frame)
+
+            event_dict.update({
+                "framearray_path": frame_arary_output_name
+            })
 
     with open(output_path_meta, "w", encoding = "utf-8") as output_file:
         json.dump(processed_events, output_file, indent=2)
     
+    return output_path_meta
 
 ## MAIN FUNCTION ##
 def main(input_data = None) -> None:
@@ -167,10 +176,10 @@ def main(input_data = None) -> None:
     if input_data is None:
         events_df = load_events(input_file = INPUT_EVENTS_PATH)
 
-    #group_tasks = dict(events_df.select("group", "task").iter_rows())
-    group_tasks = {"C4": "13"}
-
+    group_tasks = dict(events_df.select("group", "task").iter_rows())
+    
     processed_events = []
+    events_failed = 0
 
     for group, task in group_tasks.items():
 
@@ -178,8 +187,12 @@ def main(input_data = None) -> None:
 
         try:
 
-            screenrec_filepath = _get_filename(group, task)
-            
+            screenrec_filepath, filename_lookup = _get_filename(group, task)
+
+            if not screenrec_filepath:
+                logger.error(f"Failed to find video for {group}-{task}. Expected filename to match: {filename_lookup}")
+                continue
+
             logger.info(f"Recording found at {screenrec_filepath}")
 
             event_timestamps_group_task = events_df.filter(
@@ -191,7 +204,7 @@ def main(input_data = None) -> None:
                 logging.warning(f"No events found for {group}-{task}. Continuing...")
                 continue
 
-            logger.info(f"{len(event_timestamps_group_task)} loaded for file {screenrec_filepath}")
+            logger.info(f"{len(event_timestamps_group_task)} events loaded for file {screenrec_filepath}")
 
             framearrays_in_intervals = extract_framearrays(
                 screenrec_filepath,
@@ -211,36 +224,32 @@ def main(input_data = None) -> None:
 
             logger.info("Framearraays annotated")
 
-            combined_entries = _combine_entries(group, task, event_timestamps_group_task, frames_annotated)
+            combined_entries, group_task_events_failed = _combine_entries(group, task, event_timestamps_group_task, frames_annotated)
 
             logger.info(f"Processed {len(combined_entries)} frames for {group}-{task}")
 
             processed_events.extend(combined_entries)
+            events_failed += group_task_events_failed
 
         except Exception as e:
             logger.error(f"Processing failed for {group}-{task} with error: \n {e}")
 
-    logger.info(f"Storing {len(processed_events)} tagged frames to {OUTPUT_FRAMEARRAYS}")
+    logger.info(f"Storing {len(processed_events)-events_failed} tagged events to {OUTPUT_FRAMEARRAYS}. {events_failed} failed.")
 
     try:        
-        _store_framearrays(
+        output_path_meta = _store_framearrays(
             processed_events,
             OUTPUT_FRAMEARRAYS
         )
     except Exception as e:
         logger.error(f"Failed to store processed events to {OUTPUT_FRAMEARRAYS} with error: \n {e}")
 
+    logger.info(f"Processed events saved to {OUTPUT_FRAMEARRAYS}")
 
-        # TODO: Analyze tag function: last tag, change in tag
-
-        # TODO: Disregard last tag == unknown (or all tags unknown?)
-
-        # TODO: Output: Similar output as other pipeline - distribution of UI tags
-
-
-    
-    
-
+    analyze_frames(
+        OUTPUT_FRAMEARRAYS,
+        output_path_meta
+    )
 
 
 ## CALL OF MAIN FUNCTION ##

@@ -46,10 +46,18 @@ def annotate_frame(
     frame: np.ndarray,
     reference_dir: Path,
     reference_set: Path,
-    acceptance_threshold: float = 0.5
+    acceptance_threshold: float = 0.5,
+    use_resolution: dict | None = None
     ):
 
     references = _load_references(reference_dir, reference_set)
+
+    if use_resolution is not None:
+        frame = cv2.resize(
+            frame,
+            (use_resolution["width"], use_resolution["height"]),
+            interpolation = cv2.INTER_AREA
+        )
 
     for reference in references:
         reference.update({
@@ -70,18 +78,24 @@ def annotate_frame(
 def annotate_frames_in_intervals(
     frames_in_intervals,
     reference_dir: Path,
-    reference_set: Path
+    reference_set: Path, 
+    acceptance_threshold: float = 0.5,
+    use_resolution: dict | None = None
     ):
 
     frames_annotated = []
 
-    for start, end, frame in frames_in_intervals:
+    for frames_in_interval in frames_in_intervals:
 
-        tag = annotate_frame(frame, reference_dir, reference_set)
+        interval_frames = []
+        for start, end, frame in frames_in_interval:
 
-        frames_annotated.append(
-            (start, end, frame, tag)
-        )
+            tag = annotate_frame(frame, reference_dir, reference_set, acceptance_threshold, use_resolution)
 
+            interval_frames.append(
+                (start, end, frame, tag)
+            )
+        
+        frames_annotated.append(interval_frames)
 
     return frames_annotated

@@ -50,6 +50,9 @@ def annotate_frame(
     use_resolution: dict | None = None
     ):
 
+    if frame is None:
+        return "No frame available"
+
     references = _load_references(reference_dir, reference_set)
 
     if use_resolution is not None:
@@ -87,15 +90,15 @@ def annotate_frames_in_intervals(
 
     for frames_in_interval in frames_in_intervals:
 
-        interval_frames = []
+        interval_frames_tagged = []
         for start, end, frame in frames_in_interval:
 
             tag = annotate_frame(frame, reference_dir, reference_set, acceptance_threshold, use_resolution)
 
-            interval_frames.append(
+            interval_frames_tagged.append(
                 (start, end, frame, tag)
             )
         
-        frames_annotated.append(interval_frames)
+        frames_annotated.append(interval_frames_tagged)
 
     return frames_annotated

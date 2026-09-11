@@ -80,3 +80,15 @@ def frames_are_similar(
     """
 
     return not frames_are_not_similar(frame, retained_frame, similarity_threshold)
+
+
+def frames_are_similar_pixeldif(frame1, frame2, tolerance_pct = 10):
+    """Determine whether two frames are near identical based on tolerance_pct (% pixels allowed to deviate)"""
+    
+    pixels_differ = np.any(frame1 != frame2, axis=2)
+
+    diff_pct = pixels_differ.mean() * 100
+
+    below_tolerance = diff_pct < tolerance_pct
+
+    return below_tolerance

@@ -16,17 +16,6 @@ from .frame_similarity import frames_are_similar, frames_are_not_similar
 logger = logging.getLogger(__name__)
 
 ## HELPER FUNCTIONS ##
-def _frames_are_similar(frame1, frame2, tolerance_pct = 10):
-    """Determine whether two frames are near identical based on tolerance_pct (% pixels allowed to deviate)"""
-    
-    pixels_differ = np.any(frame1 != frame2, axis=2)
-
-    diff_pct = pixels_differ.mean() * 100
-
-    below_tolerance = diff_pct < tolerance_pct
-
-    return below_tolerance
-
 def _get_framearrays_from_interval(
     cap,
     start_s,
@@ -48,9 +37,17 @@ def _aggregate_framearrays(
     aggregated_framearrays = []
 
     if not framearrays:
-        logger.warning(f"List of framearrays from start {start_s} is empty. Nothing to aggregate")
+        logger.error(f"List of framearrays from start {start_s} is empty. Nothing to aggregate")
         return []
-        
+    
+    framearrays = [(timestamp_s, frame) for timestamp_s, frame in framearrays if frame is not None]
+
+    if not framearrays:
+        logger.warning(f"No frames for interval with start {start_s}. Nothing to aggregate")
+        return [
+            (start_s, stop_s, None)
+        ]
+
     interval_start = framearrays[0][0]
     representative_frame = framearrays[0][1]
 
@@ -93,9 +90,11 @@ def iter_framearrays(
         success, frame = cap.read()
 
         if not success:
-            logger.warning(f"Failed to load frame at {start_s}")
-            break
-
+            logger.warning(f"Failed to load frame at {timestamp_s}")
+            yield timestamp_s, None
+            timestamp_s += dt
+            continue
+            
         if use_resolution is not None:
             frame = cv2.resize(
                 frame,
@@ -164,10 +163,10 @@ def extract_framearrays(
     frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     duration_s = frame_count / fps
 
-    logging.info(f"estimated duration: {duration_s}")
+    logger.info(f"estimated duration: {duration_s}")
 
     time_intervals = [
-        range(max(timestamp-buffer_ms-context_include_ms, 0), max(timestamp-buffer_ms, 0)) for timestamp in timestamps
+        range(max(timestamp-buffer_ms-context_include_ms, 0), max(timestamp-buffer_ms, 1)) for timestamp in timestamps
     ]
 
     framearrays_in_intervals = []

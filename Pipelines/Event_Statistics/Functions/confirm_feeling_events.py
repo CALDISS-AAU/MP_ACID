@@ -1,4 +1,4 @@
-"""Helper functions for the Feeling_Confirmation pipeline."""
+"""Compare manual events with machine-detected feelings."""
 
 ## IMPORTS ##
 import logging
@@ -8,33 +8,11 @@ import polars as pl
 ## _______ ##
 
 
-## STATIC VARIABLES ##
-FEELING_COLUMNS = [
-    "Anger",
-    "Contempt",
-    "Confusion",
-    "Disgust",
-    # "Engagement",
-    "Fear",
-    # "Joy",
-    "Sadness",
-    "Surprise",
-]
-
-TIME_WINDOW_MS = 5_000
-## ________________ ##
-
-
 ## HELPER FUNCTIONS ##
 def _parse_manual_timestamp_ms(
     timestamp: str,
 ) -> int:
-    """
-    Convert a manual timestamp in mm:ss format to milliseconds.
-
-    Example:
-        05:02 -> 302,000 milliseconds
-    """
+    """Convert an mm:ss timestamp to milliseconds."""
     try:
         minutes_text, seconds_text = timestamp.strip().split(
             ":",
@@ -71,9 +49,7 @@ def _parse_manual_timestamp_ms(
 def _normalise_task(
     task: object,
 ) -> int:
-    """
-    Convert task values such as '05', 5, or 5.0 to integer 5.
-    """
+    """Convert a numeric task value to an integer."""
     try:
         return int(float(str(task).strip()))
     except (TypeError, ValueError) as error:
@@ -87,17 +63,15 @@ def feeling_confirmation(
     input_dir_manual: str,
     input_dir_machine: str,
     output_dir: str,
+    feeling_cols: list[str],
+    time_window_ms: int,
     logger: logging.Logger,
 ) -> None:
-    """
-    Compare manually registered events with machine-registered feelings.
-
-    For every manual event, inspect the corresponding machine data for
-    the same group and task within two seconds before and after the
-    manually registered timestamp.
-
-    The resulting CSV reports whether any feelings were detected,
-    which feelings were detected, and the count for each feeling.
+    """Import and validate manual and machine data ->
+       Normalise event identifiers and timestamps ->
+       Compare events within the configured time window ->
+       Summarise detected feelings and their counts ->
+       Save the feeling-confirmation report
     """
     output_directory = Path(output_dir)
     output_path = (
@@ -136,7 +110,7 @@ def feeling_confirmation(
             "Timestamp",
             "group",
             "task",
-            *FEELING_COLUMNS,
+            *feeling_cols,
         }
 
         missing_manual_columns = (
@@ -187,7 +161,7 @@ def feeling_confirmation(
                 .cast(pl.Int64, strict=False)
                 .fill_null(0)
                 .alias(feeling)
-                for feeling in FEELING_COLUMNS
+                for feeling in feeling_cols
             ],
         )
 
@@ -214,11 +188,11 @@ def feeling_confirmation(
 
             window_start_ms = max(
                 0,
-                timestamp_ms - TIME_WINDOW_MS,
+                timestamp_ms - time_window_ms,
             )
 
             window_end_ms = (
-                timestamp_ms + TIME_WINDOW_MS
+                timestamp_ms + time_window_ms
             )
 
             matching_machine_rows = df_machine.filter(
@@ -237,7 +211,7 @@ def feeling_confirmation(
             if matching_machine_rows.is_empty():
                 feeling_counts = {
                     feeling: 0
-                    for feeling in FEELING_COLUMNS
+                    for feeling in feeling_cols
                 }
             else:
                 feeling_counts = (
@@ -246,7 +220,7 @@ def feeling_confirmation(
                             pl.col(feeling)
                             .sum()
                             .alias(feeling)
-                            for feeling in FEELING_COLUMNS
+                            for feeling in feeling_cols
                         ]
                     )
                     .row(
@@ -259,7 +233,7 @@ def feeling_confirmation(
                     feeling: int(
                         feeling_counts[feeling] or 0
                     )
-                    for feeling in FEELING_COLUMNS
+                    for feeling in feeling_cols
                 }
 
             detected_feelings = [

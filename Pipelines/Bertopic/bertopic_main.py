@@ -14,7 +14,7 @@ from .Functions.model_training import train_model
 ## STATIC VARIABLES ##
 # Directories - input
 INPUT_BASE = "."
-INPUT_DIR_DATA = f"{INPUT_BASE}/Data/Data_Combination_OLD/combined_data_when_feelings_85.json"
+INPUT_DIR_DATA = f"{INPUT_BASE}/Data/Data_Combination/combined_data_when_feelings_pc85_pre0_post0.json"
 
 # Directories - internal output
 OUTPUT_DIR_TRAINED_MODEL_BASE = "Pipelines/Bertopic/Data/trained_model"
@@ -37,11 +37,11 @@ STOPWORDS_EXTENSION = [
     'nååååå', 'hey', 'yes', 
 ]
 # Umap
-N_NEIGHBOURS = [10, 15, 20]
-N_COMPONENTS = [10, 20]
+N_NEIGHBOURS = [10]
+N_COMPONENTS = [10]
 # HDB
-MIN_CLUSTER_SIZE = [20, 30, 40, 50]
-MIN_SAMPLES = [5, 10]
+MIN_CLUSTER_SIZE = [40]
+MIN_SAMPLES = [5]
 # Vectorizer_model
 MAX_DF = [0.8]
 NGRAM_RANGE = [(1,2)]

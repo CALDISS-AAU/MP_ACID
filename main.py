@@ -10,12 +10,20 @@
 """
 ## IMPORTS ##
 # Pipeline mains
-from Pipelines.Example_Pipeline.example_pipeline_main import main as example_pipeline_main
+from Pipelines.Standardise_Data.standardise_data_main import main as standardise_data
+from Pipelines.Data_Combination.data_combination_main import main as combine_data
+from Pipelines.Feelings_Investigation.feelings_investigation_main import main as investigate_feelings
+from Pipelines.Bertopic.bertopic_main import main as BERTopic
+from Pipelines.Event_Statistics.event_statistics_main import main as event_statistics
 ## _______ ##
 
 ## MAIN FUNCTION ##
 def main() -> None:
-    example_pipeline_main()
+    standardise_data()
+    combine_data()
+    investigate_feelings()
+    BERTopic()
+    event_statistics()
 ## _____________ ##
 
 ## CALL OF MAIN FUNCTION ##

@@ -1,4 +1,4 @@
-"""Example helper functions for the pipeline."""
+"""Combine standardised FEA, transcription, and mouse-tracking data."""
 
 ## IMPORTS ##
 import logging
@@ -14,12 +14,14 @@ Row = dict[str, Any]
 Lookup = dict[tuple[str, str], list[Row]]
 ## ___________ ##
 
+
 ## HELPER FUNCTIONS ##
 def _extract_feeling_timestamps(
     feelings_data: pl.DataFrame,
     relevant_feelings: list[str],
     logger: logging.Logger,
 ) -> pl.DataFrame:
+    """Extract timestamps at which any relevant feeling is present."""
     events = (
         feelings_data
         .filter(pl.any_horizontal(pl.col(relevant_feelings) == 1))
@@ -41,6 +43,22 @@ def _extract_matching_transcriptions(
     number_of_postdecending_sentences: int,
     logger: logging.Logger,
 ) -> pl.DataFrame:
+    """Match feeling events to transcription intervals.
+
+    Args:
+        transcription_data: Transcription rows grouped by task and group.
+        events: Feeling-event timestamps to match to transcriptions.
+        number_of_predecending_sentences: Earlier sentences to include.
+        number_of_postdecending_sentences: Later sentences to include.
+        logger: Logger used to record the extraction.
+
+    Returns:
+        Matched transcription intervals with their extended text.
+
+    Raises:
+        ValueError: If either sentence count is negative.
+
+    """
     if number_of_predecending_sentences < 0:
         raise ValueError(
             "number_of_predecending_sentences must be non-negative"
@@ -164,7 +182,7 @@ def _extract_matching_transcriptions(
 def _build_group_task_lookup(
     data: pl.DataFrame,
 ) -> Lookup:
-    """Organize dataframe rows by group and task."""
+    """Organise dataframe rows by group and task."""
     lookup = {}
 
     for row in data.iter_rows(named=True):
@@ -178,7 +196,7 @@ def _get_matching_interval_rows(
     interval: Row,
     lookup: Lookup,
 ) -> list[Row]:
-    """Find rows with the same group/task inside an interval."""
+    """Find rows with the same group and task inside an interval."""
     key = (interval["group"], interval["task"])
     rows = lookup.get(key, [])
 
@@ -216,7 +234,11 @@ def _add_present_feelings(
     relevant_feelings: list[str],
     logger: logging.Logger,
 ) -> pl.DataFrame:
-    """Add all relevant feelings present in each interval."""
+    """Organise feeling rows by group and task ->
+       Match feeling rows to each transcription interval ->
+       Identify the relevant feelings present in each interval ->
+       Add the present feelings as a list column
+    """
     feelings_lookup = _build_group_task_lookup(feelings_data)
     feelings_per_interval = []
 
@@ -346,6 +368,12 @@ def extract_and_combine(
     number_of_postdecending_sentences: int,
     logger: logging.Logger,
 ) -> None:
+    """Extract timestamps containing relevant feelings ->
+       Match feeling events to transcription intervals ->
+       Add surrounding transcription context ->
+       Add feelings and input events to each interval ->
+       Save the combined data as CSV and JSON files
+    """
     feelings_data = pl.read_csv(input_dir_fea_data)
     transcription_data = pl.read_csv(input_dir_transcription_data)
     input_data = pl.read_csv(input_dir_mouse_data)

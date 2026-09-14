@@ -1,4 +1,4 @@
-"""Plotting functions for the Feelings_Investigation pipeline."""
+"""Create interactive plots for the Feelings_Investigation pipeline."""
 
 ## IMPORTS ##
 import logging
@@ -97,6 +97,406 @@ def _find_sequential_one_lengths(
         sequence_lengths.append(current_length)
 
     return sequence_lengths
+
+
+def _apply_feeling_vs_time_design(
+    figure: go.Figure,
+    task: str,
+    certainty: str,
+    number_of_groups: int,
+    maximum_timestamp: int,
+    subplot_rows: int,
+    subplot_columns: int,
+) -> None:
+    """Apply the layout and axis design to a feeling-over-time figure.
+
+    Args:
+        figure: Plotly figure to style.
+        task: Task represented by the figure.
+        certainty: FEA certainty threshold.
+        number_of_groups: Number of group subplots.
+        maximum_timestamp: Largest task timestamp in milliseconds.
+        subplot_rows: Number of subplot rows.
+        subplot_columns: Number of subplot columns.
+
+    """
+    figure.update_xaxes(
+        range=[0, maximum_timestamp],
+        autorange=False,
+        rangemode="tozero",
+    )
+
+    figure.update_yaxes(
+        range=[-0.05, 1.05],
+        tickmode="array",
+        tickvals=[0, 1],
+        ticktext=["No", "Yes"],
+    )
+
+    figure.update_layout(
+        title={
+            "text": (
+                "Detected emotions over time"
+                f"<br><sup>Task {task} · "
+                f"Threshold {certainty}% · "
+                f"{number_of_groups} groups</sup>"
+            )
+        },
+        template="plotly_white",
+        hovermode="closest",
+        legend={
+            "title": {
+                "text": "Emotions",
+            },
+            "groupclick": "togglegroup",
+        },
+        height=max(
+            650,
+            subplot_rows * 260,
+        ),
+    )
+
+    for column in range(1, subplot_columns + 1):
+        figure.update_xaxes(
+            title_text="Time (ms)",
+            row=subplot_rows,
+            col=column,
+        )
+
+    for row in range(1, subplot_rows + 1):
+        figure.update_yaxes(
+            title_text="Detected",
+            row=row,
+            col=1,
+        )
+
+
+def _generate_feeling_vs_time_figure(
+    task_df: pl.DataFrame,
+    task: str,
+    groups: list[str],
+    feeling_cols: list[str],
+    feeling_colours: dict[str, str],
+    certainty: str,
+) -> go.Figure:
+    """Create group subplots and feeling traces ->
+       Apply the feeling-over-time graph design ->
+       Return the completed figure
+    """
+    subplot_columns = 2
+    subplot_rows = (
+        len(groups) + subplot_columns - 1
+    ) // subplot_columns
+
+    figure = make_subplots(
+        rows=subplot_rows,
+        cols=subplot_columns,
+        subplot_titles=[
+            f"Group {group}"
+            for group in groups
+        ],
+        shared_xaxes=True,
+        shared_yaxes=True,
+        vertical_spacing=min(
+            0.04,
+            0.4 / subplot_rows,
+        ),
+        horizontal_spacing=0.08,
+    )
+
+    maximum_timestamp = (
+        task_df.get_column("Timestamp")
+        .cast(pl.Int64)
+        .max()
+    )
+
+    for group_index, group in enumerate(groups):
+        subplot_row = (
+            group_index // subplot_columns
+        ) + 1
+        subplot_column = (
+            group_index % subplot_columns
+        ) + 1
+
+        plot_df = (
+            task_df.filter(
+                pl.col("group") == group
+            )
+            .sort("Timestamp")
+        )
+
+        timestamps = (
+            plot_df.get_column("Timestamp")
+            .cast(pl.Int64)
+            .to_list()
+        )
+
+        for feeling in feeling_cols:
+            feeling_values = (
+                plot_df.get_column(feeling)
+                .cast(pl.Int8)
+                .to_list()
+            )
+
+            figure.add_trace(
+                go.Scattergl(
+                    x=timestamps,
+                    y=feeling_values,
+                    mode="lines",
+                    name=feeling,
+                    legendgroup=feeling,
+                    showlegend=(group_index == 0),
+                    line={
+                        "color": feeling_colours[feeling],
+                        "width": 1,
+                        "shape": "hv",
+                    },
+                    hovertemplate=(
+                        f"<b>{feeling}</b><br>"
+                        f"Group: {group}<br>"
+                        "Time: %{x:,} ms<br>"
+                        "Detected: %{y}"
+                        "<extra></extra>"
+                    ),
+                ),
+                row=subplot_row,
+                col=subplot_column,
+            )
+
+    _apply_feeling_vs_time_design(
+        figure=figure,
+        task=task,
+        certainty=certainty,
+        number_of_groups=len(groups),
+        maximum_timestamp=maximum_timestamp,
+        subplot_rows=subplot_rows,
+        subplot_columns=subplot_columns,
+    )
+
+    return figure
+
+
+def _apply_sequence_distribution_design(
+    figure: go.Figure,
+    task: str,
+    certainty: str,
+    number_of_groups: int,
+    feeling_cols: list[str],
+    subplot_rows: int,
+    subplot_columns: int,
+) -> None:
+    """Apply the design to a sequence-distribution figure.
+
+    Args:
+        figure: Plotly figure to style.
+        task: Task represented by the figure.
+        certainty: FEA certainty threshold.
+        number_of_groups: Number of group subplots.
+        feeling_cols: Feeling names displayed on the x-axis.
+        subplot_rows: Number of subplot rows.
+        subplot_columns: Number of subplot columns.
+
+    """
+    figure.update_xaxes(
+        tickmode="array",
+        tickvals=list(range(len(feeling_cols))),
+        ticktext=feeling_cols,
+        tickangle=-35,
+        range=[
+            -0.5,
+            len(feeling_cols) - 0.2,
+        ],
+    )
+
+    figure.update_yaxes(
+        range=[0, 100],
+        autorange=False,
+        tickmode="linear",
+        tick0=0,
+        dtick=50,
+    )
+
+    figure.update_layout(
+        title={
+            "text": (
+                "Sequential emotion-detection lengths"
+                f"<br><sup>Task {task} · "
+                f"Threshold {certainty}% · "
+                f"{number_of_groups} groups</sup>"
+            )
+        },
+        template="plotly_white",
+        violinmode="overlay",
+        boxmode="overlay",
+        hovermode="closest",
+        legend={
+            "title": {
+                "text": "Emotions",
+            },
+            "groupclick": "togglegroup",
+        },
+        height=max(
+            650,
+            subplot_rows * 300,
+        ),
+    )
+
+    for column in range(1, subplot_columns + 1):
+        figure.update_xaxes(
+            title_text="Feeling",
+            row=subplot_rows,
+            col=column,
+        )
+
+    for row in range(1, subplot_rows + 1):
+        figure.update_yaxes(
+            title_text="Sequential rows",
+            row=row,
+            col=1,
+        )
+
+
+def _generate_sequence_distribution_figure(
+    task_df: pl.DataFrame,
+    task: str,
+    groups: list[str],
+    feeling_cols: list[str],
+    feeling_colours: dict[str, str],
+    certainty: str,
+) -> tuple[go.Figure, int]:
+    """Find uninterrupted feeling-detection sequences ->
+    Add box and violin traces for each group ->
+    Apply the sequence-distribution graph design ->
+    Return the completed figure and sequence count
+    """
+    subplot_columns = 2
+    subplot_rows = (
+        len(groups) + subplot_columns - 1
+    ) // subplot_columns
+
+    figure = make_subplots(
+        rows=subplot_rows,
+        cols=subplot_columns,
+        subplot_titles=[
+            f"Group {group}"
+            for group in groups
+        ],
+        shared_yaxes=True,
+        vertical_spacing=min(
+            0.04,
+            0.4 / subplot_rows,
+        ),
+        horizontal_spacing=0.08,
+    )
+
+    total_sequences = 0
+
+    for group_index, group in enumerate(groups):
+        subplot_row = (
+            group_index // subplot_columns
+        ) + 1
+        subplot_column = (
+            group_index % subplot_columns
+        ) + 1
+
+        group_df = (
+            task_df.filter(
+                pl.col("group") == group
+            )
+            .sort("Timestamp")
+        )
+
+        for feeling_index, feeling in enumerate(feeling_cols):
+            values = (
+                group_df.get_column(feeling)
+                .cast(pl.Int8)
+                .to_list()
+            )
+
+            sequence_lengths = _find_sequential_one_lengths(
+                values
+            )
+
+            total_sequences += len(sequence_lengths)
+
+            if not sequence_lengths:
+                continue
+
+            colour = feeling_colours[feeling]
+
+            figure.add_trace(
+                go.Box(
+                    x=[
+                        feeling_index - 0.12
+                    ] * len(sequence_lengths),
+                    y=sequence_lengths,
+                    name=feeling,
+                    legendgroup=feeling,
+                    showlegend=False,
+                    width=0.16,
+                    boxpoints=False,
+                    fillcolor=colour,
+                    line={
+                        "color": colour,
+                        "width": 1.5,
+                    },
+                    marker={
+                        "color": colour,
+                    },
+                    opacity=0.85,
+                    hovertemplate=(
+                        f"<b>{feeling}</b><br>"
+                        f"Group: {group}<br>"
+                        "Sequence length: %{y} rows"
+                        "<extra></extra>"
+                    ),
+                ),
+                row=subplot_row,
+                col=subplot_column,
+            )
+
+            figure.add_trace(
+                go.Violin(
+                    x0=feeling_index,
+                    y=sequence_lengths,
+                    name=feeling,
+                    legendgroup=feeling,
+                    showlegend=(group_index == 0),
+                    side="positive",
+                    width=0.7,
+                    points=False,
+                    meanline={
+                        "visible": True,
+                    },
+                    line={
+                        "color": colour,
+                        "width": 1.5,
+                    },
+                    fillcolor=colour,
+                    opacity=0.55,
+                    spanmode="hard",
+                    hovertemplate=(
+                        f"<b>{feeling}</b><br>"
+                        f"Group: {group}<br>"
+                        "Sequence length: %{y} rows"
+                        "<extra></extra>"
+                    ),
+                ),
+                row=subplot_row,
+                col=subplot_column,
+            )
+
+    _apply_sequence_distribution_design(
+        figure=figure,
+        task=task,
+        certainty=certainty,
+        number_of_groups=len(groups),
+        feeling_cols=feeling_cols,
+        subplot_rows=subplot_rows,
+        subplot_columns=subplot_columns,
+    )
+
+    return figure, total_sequences
 ## __________________ ##
 
 
@@ -107,7 +507,12 @@ def feeling_vs_time_graph(
     feeling_cols: list[str],
     logger: logging.Logger,
 ) -> None:
-    """Create one interactive figure per task, with one subplot per group."""
+    """Read and validate an FEA dataset ->
+       Extract the certainty threshold and assign feeling colours ->
+       Create one figure per task with one subplot per group ->
+       Plot feeling detections over time ->
+       Save each figure as an interactive HTML file
+    """
 
     input_file = Path(input_file)
     output_folder = Path(output_folder)
@@ -162,11 +567,10 @@ def feeling_vs_time_graph(
         input_file.name,
     )
 
-    # Two columns keeps the individual group panels reasonably readable.
-    subplot_columns = 2
-
     for task in tasks:
-        task_df = df.filter(pl.col("task") == task)
+        task_df = df.filter(
+            pl.col("task") == task
+        )
 
         groups = (
             task_df.get_column("group")
@@ -184,157 +588,24 @@ def feeling_vs_time_graph(
             )
             continue
 
-        subplot_rows = (
-            len(groups) + subplot_columns - 1
-        ) // subplot_columns
-
-        figure = make_subplots(
-            rows=subplot_rows,
-            cols=subplot_columns,
-            subplot_titles=[
-                f"Group {group}"
-                for group in groups
-            ],
-            shared_xaxes=True,
-            shared_yaxes=True,
-            vertical_spacing=min(
-                0.04,
-                0.4 / subplot_rows,
-            ),
-            horizontal_spacing=0.08,
+        figure = _generate_feeling_vs_time_figure(
+            task_df=task_df,
+            task=task,
+            groups=groups,
+            feeling_cols=feeling_cols,
+            feeling_colours=feeling_colours,
+            certainty=certainty,
         )
-
-        task_maximum_timestamp = (
-            task_df.get_column("Timestamp")
-            .cast(pl.Int64)
-            .max()
-        )
-
-        for group_index, group in enumerate(groups):
-            subplot_row = (
-                group_index // subplot_columns
-            ) + 1
-            subplot_column = (
-                group_index % subplot_columns
-            ) + 1
-
-            plot_df = (
-                task_df.filter(
-                    pl.col("group") == group
-                )
-                .sort("Timestamp")
-            )
-
-            timestamps = (
-                plot_df.get_column("Timestamp")
-                .cast(pl.Int64)
-                .to_list()
-            )
-
-            for feeling in feeling_cols:
-                feeling_values = (
-                    plot_df.get_column(feeling)
-                    .cast(pl.Int8)
-                    .to_list()
-                )
-
-                figure.add_trace(
-                    go.Scattergl(
-                        x=timestamps,
-                        y=feeling_values,
-                        mode="lines",
-                        name=feeling,
-                        legendgroup=feeling,
-                        showlegend=(group_index == 0),
-                        line={
-                            "color": feeling_colours[feeling],
-                            "width": 1,
-                            "shape": "hv",
-                        },
-                        hovertemplate=(
-                            f"<b>{feeling}</b><br>"
-                            f"Group: {group}<br>"
-                            "Time: %{x:,} ms<br>"
-                            "Detected: %{y}"
-                            "<extra></extra>"
-                        ),
-                    ),
-                    row=subplot_row,
-                    col=subplot_column,
-                )
-
-            figure.update_xaxes(
-                range=[0, task_maximum_timestamp],
-                autorange=False,
-                rangemode="tozero",
-                row=subplot_row,
-                col=subplot_column,
-            )
-
-            figure.update_yaxes(
-                range=[-0.05, 1.05],
-                tickmode="array",
-                tickvals=[0, 1],
-                ticktext=["No", "Yes"],
-                row=subplot_row,
-                col=subplot_column,
-            )
-
-        figure.update_layout(
-            title={
-                "text": (
-                    "Detected emotions over time"
-                    f"<br><sup>Task {task} · "
-                    f"Threshold {certainty}% · "
-                    f"{len(groups)} groups</sup>"
-                )
-            },
-            template="plotly_white",
-            hovermode="closest",
-            legend={
-                "title": {
-                    "text": "Emotions",
-                },
-                # Clicking an emotion hides it in every group panel.
-                "groupclick": "togglegroup",
-            },
-            height=max(
-                650,
-                subplot_rows * 260,
-            ),
-        )
-
-        # Add axis titles only along the outside of the figure.
-        for column in range(1, subplot_columns + 1):
-            figure.update_xaxes(
-                title_text="Time (ms)",
-                row=subplot_rows,
-                col=column,
-            )
-
-        for row in range(1, subplot_rows + 1):
-            figure.update_yaxes(
-                title_text="Detected",
-                row=row,
-                col=1,
-            )
 
         safe_task = _make_safe_filename(str(task))
-
-        plot_directory = (
-            output_folder
-            / f"FEA_{certainty}"
-        )
+        plot_directory = output_folder / f"FEA_{certainty}"
 
         plot_directory.mkdir(
             parents=True,
             exist_ok=True,
         )
 
-        output_file = (
-            plot_directory
-            / f"task_{safe_task}.html"
-        )
+        output_file = plot_directory / f"task_{safe_task}.html"
 
         figure.write_html(
             output_file,
@@ -347,19 +618,6 @@ def feeling_vs_time_graph(
             },
         )
 
-        logger.info(
-            (
-                "Saved combined plot for task %s, "
-                "threshold %s%%, containing %d groups to %s. "
-                "X-axis range: 0-%d ms"
-            ),
-            task,
-            certainty,
-            len(groups),
-            output_file,
-            task_maximum_timestamp,
-        )
-
 
 def feeling_sequence_distribution_graph(
     input_file: str | Path,
@@ -367,7 +625,10 @@ def feeling_sequence_distribution_graph(
     feeling_cols: list[str],
     logger: logging.Logger,
 ) -> None:
-    """Plot distributions of sequential emotion detections per group and task."""
+    """Read and validate an FEA dataset ->
+       Generate sequence-distribution figures for each task ->
+       Save each figure as an interactive HTML file
+    """
 
     input_file = Path(input_file)
     output_folder = Path(output_folder)
@@ -444,191 +705,19 @@ def feeling_sequence_distribution_graph(
             )
             continue
 
-        subplot_rows = (
-            len(groups) + subplot_columns - 1
-        ) // subplot_columns
-
-        figure = make_subplots(
-            rows=subplot_rows,
-            cols=subplot_columns,
-            subplot_titles=[
-                f"Group {group}"
-                for group in groups
-            ],
-            shared_yaxes=True,
-            vertical_spacing=min(
-                0.04,
-                0.4 / subplot_rows,
-            ),
-            horizontal_spacing=0.08,
+        figure, total_sequences = (
+            _generate_sequence_distribution_figure(
+                task_df=task_df,
+                task=task,
+                groups=groups,
+                feeling_cols=feeling_cols,
+                feeling_colours=feeling_colours,
+                certainty=certainty,
+            )
         )
-
-        total_sequences = 0
-
-        for group_index, group in enumerate(groups):
-            subplot_row = (
-                group_index // subplot_columns
-            ) + 1
-            subplot_column = (
-                group_index % subplot_columns
-            ) + 1
-
-            group_df = (
-                task_df.filter(
-                    pl.col("group") == group
-                )
-                .sort("Timestamp")
-            )
-
-            for feeling_index, feeling in enumerate(feeling_cols):
-                values = (
-                    group_df.get_column(feeling)
-                    .cast(pl.Int8)
-                    .to_list()
-                )
-
-                sequence_lengths = (
-                    _find_sequential_one_lengths(values)
-                )
-
-                total_sequences += len(sequence_lengths)
-
-                if not sequence_lengths:
-                    continue
-
-                colour = feeling_colours[feeling]
-
-                # Box plot positioned slightly left of the feeling's tick.
-                figure.add_trace(
-                    go.Box(
-                        x=[feeling_index - 0.12] * len(sequence_lengths),
-                        y=sequence_lengths,
-                        name=feeling,
-                        legendgroup=feeling,
-                        showlegend=False,
-                        width=0.16,
-                        boxpoints=False,
-                        fillcolor=colour,
-                        line={
-                            "color": colour,
-                            "width": 1.5,
-                        },
-                        marker={
-                            "color": colour,
-                        },
-                        opacity=0.85,
-                        hovertemplate=(
-                            f"<b>{feeling}</b><br>"
-                            f"Group: {group}<br>"
-                            "Sequence length: %{y} rows"
-                            "<extra></extra>"
-                        ),
-                    ),
-                    row=subplot_row,
-                    col=subplot_column,
-                )
-
-                # Half violin beginning at the feeling's tick
-                # and extending towards the right.
-                figure.add_trace(
-                    go.Violin(
-                        x0=feeling_index,
-                        y=sequence_lengths,
-                        name=feeling,
-                        legendgroup=feeling,
-                        showlegend=(group_index == 0),
-                        side="positive",
-                        width=0.7,
-                        points=False,
-                        meanline={
-                            "visible": True,
-                        },
-                        line={
-                            "color": colour,
-                            "width": 1.5,
-                        },
-                        fillcolor=colour,
-                        opacity=0.55,
-                        spanmode="hard",
-                        hovertemplate=(
-                            f"<b>{feeling}</b><br>"
-                            f"Group: {group}<br>"
-                            "Sequence length: %{y} rows"
-                            "<extra></extra>"
-                        ),
-                    ),
-                    row=subplot_row,
-                    col=subplot_column,
-                )
-
-            figure.update_xaxes(
-                tickmode="array",
-                tickvals=list(range(len(feeling_cols))),
-                ticktext=feeling_cols,
-                tickangle=-35,
-                range=[
-                    -0.5,
-                    len(feeling_cols) - 0.2,
-                ],
-                row=subplot_row,
-                col=subplot_column,
-            )
-
-            figure.update_yaxes(
-                range=[0, 100],
-                autorange=False,
-                tickmode="linear",
-                tick0=0,
-                dtick=50,
-                row=subplot_row,
-                col=subplot_column,
-            )
-
-        figure.update_layout(
-            title={
-                "text": (
-                    "Sequential emotion-detection lengths"
-                    f"<br><sup>Task {task} · "
-                    f"Threshold {certainty}% · "
-                    f"{len(groups)} groups</sup>"
-                )
-            },
-            template="plotly_white",
-            violinmode="overlay",
-            boxmode="overlay",
-            hovermode="closest",
-            legend={
-                "title": {
-                    "text": "Emotions",
-                },
-                "groupclick": "togglegroup",
-            },
-            height=max(
-                650,
-                subplot_rows * 300,
-            ),
-        )
-
-        for column in range(1, subplot_columns + 1):
-            figure.update_xaxes(
-                title_text="Feeling",
-                row=subplot_rows,
-                col=column,
-            )
-
-        for row in range(1, subplot_rows + 1):
-            figure.update_yaxes(
-                title_text="Sequential rows",
-                row=row,
-                col=1,
-            )
 
         safe_task = _make_safe_filename(str(task))
-
-        plot_directory = (
-            output_folder
-            / f"FEA_{certainty}"
-        )
+        plot_directory = output_folder / f"FEA_{certainty}"
 
         plot_directory.mkdir(
             parents=True,

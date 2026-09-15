@@ -72,6 +72,7 @@ def _store_framearrays(
     ):
     """Stores frames of processed events as numpy arrays. A json with metadata for all events are created with path for each .npy file stored"""
 
+    output_frames_dir.mkdir(parents=True, exist_ok=True)
     output_path_meta = output_frames_dir / "event_frames_meta.json"
 
     for event_dict in processed_events:

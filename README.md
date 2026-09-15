@@ -28,6 +28,20 @@ The overall structure of this project can be seen below:
 │   │   ├── Tests/
 │   │   ├── data_combination_main.py
 │   │   └── data_combination_README.md
+│   ├── Screengetter/
+│   │   ├── Data/
+│   │   ├── Functions/
+│   │   │   ├── analyze_frames.py
+│   │   │   ├── annotate_frames.py
+│   │   │   ├── array_to_img.py
+│   │   │   ├── arrays_from_frames.py
+│   │   │   ├── create_reference.py
+│   │   │   ├── event_loader.py
+│   │   │   ├── frame_similarity.py
+│   │   │   └── process_events.py
+│   │   ├── Logs/
+│   │   └── screengetter_main.py
+│   │   ├── screengetter_README.md
 │   ├── Feelings_Investigation/
 │   │   ├── Data/
 │   │   ├── Functions/
@@ -155,6 +169,9 @@ The primary dependencies include:
 - Sentence Transformers
 - spaCy
 - XlsxWriter
+- OpenCV
+- PyTorch
+- lpips
 
 Install the project dependencies from the project root using:
 
@@ -311,6 +328,7 @@ Before running the complete project, review the following configuration:
 - Set the manual-registration input path in `event_statistics_main.py`.
 - Select the required facial-expression certainty thresholds.
 - Select the feeling columns included in the analyses.
+- Create a reference set for `Pipelines.Screengetter.screengetter_main` if not already present (see pipeline documentation for details).
 - Configure the preceding and succeeding transcription context.
 - Configure the BERTopic parameter lists.
 - Configure the feeling-confirmation time window.

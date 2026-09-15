@@ -104,13 +104,24 @@ def _store_plots(
 
 ## MAIN FUNCTIONS ##
 def analyze_frames(
-    framearrays_dir: Path,
     tagged_events_path: Path,
     output_dir: Path
 ) -> None:
-    """Write total and per-task trajectory charts alongside the frame arrays.
+    """Write total and per-task UI trajectory (switches between UI views) plots and CSV of results (feeling timestamp, tags, path to arrays).
 
     Each feeling event contributes once. Tags follow frame-start order.
+
+    Parameters
+    ----------
+    tagged_events_path:
+        Path to JSON with tagged event frames.
+
+    output_dir:
+        Path to directory to store output files
+
+    Returns
+    -------
+    None
     """
 
     output_dir.mkdir(parents=True, exist_ok=True)

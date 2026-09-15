@@ -168,9 +168,10 @@ The project consists of five pipelines that run in the following order:
 
 1. `Standardise_Data`
 2. `Data_Combination`
-3. `Feelings_Investigation`
-4. `Bertopic`
-5. `Event_Statistics`
+3. `Screengetter`
+4. `Feelings_Investigation`
+5. `Bertopic`
+6. `Event_Statistics`
 
 ### Standardise Data
 
@@ -196,6 +197,16 @@ For detailed information, see:
 
 ```text
 Pipelines/Data_Combination/data_combination_README.md
+```
+
+### Screengetter
+
+The `Screengetter` pipeline analyzes where in the UI events are occurring. It extracts frames every second in the five seconds leading up to an event and compares each frame with a reference set to produce annotations. Produces an annotated dataset along with array of frames in the event windows along with barplots of UI trajectory counts.
+
+For detailed information, see:
+
+```text
+Pipelines/Screengetter/screengetter_README.md
 ```
 
 ### Feelings Investigation
@@ -254,6 +265,8 @@ Standardise Data
         ↓
 Data Combination
         ↓
+Screengetter
+        ↓
 Feelings Investigation
         ↓
 BERTopic
@@ -276,6 +289,7 @@ Individual pipelines can be run from the project root using:
 ```bash
 uv run python -m Pipelines.Standardise_Data.standardise_data_main
 uv run python -m Pipelines.Data_Combination.data_combination_main
+uv run python -m Pipelines.Screengetter.screengetter_main
 uv run python -m Pipelines.Feelings_Investigation.feelings_investigation_main
 uv run python -m Pipelines.Bertopic.bertopic_main
 uv run python -m Pipelines.Event_Statistics.event_statistics_main

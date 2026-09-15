@@ -5,8 +5,7 @@ To run this script, use the following command from the project root:
 """
 
 ## IMPORTS ##
-import re
-import json
+from collections.abc import Tuple
 from pathlib import Path
 import logging
 
@@ -79,10 +78,34 @@ def process_event_data(
     smallest_resolution: dict,
     screenrecs_dir: Path,
     reference_dir: Path, 
-    reference_set: Path):
+    reference_set: Path
+    ) -> Tuple[list[dict], int]:
     """
     Processes event data from Data_Combination pipeline. For each event timestamp, 1 frame per second is extracted in the 5 seconds leading up to the event (context settings not currently exposed at higher level function).
     Frames are tagged based on UI location using an annotated reference set.
+
+    Parameters
+    ----------
+    events_df:
+        Loaded polars dataframe of events data from Data_Combination pipeline.
+
+    smallest_resolution:
+        Dictionary of smallest resolution to standardize frames to.
+
+    screenrecs_dir:
+        Path to directory of videos to process.
+
+    reference_dir:
+        Path to directory of reference frames.
+
+    reference_set:
+        Path to JSON with annotated reference frames.
+
+    Returns
+    -------
+    List of dicts of processed event frames. One entry per frame included. (Note: There can be several frames per event)
+    Integer with count of events that failes.
+
     """
 
     group_tasks = dict(events_df.select("group", "task").iter_rows())

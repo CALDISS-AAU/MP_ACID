@@ -5,7 +5,6 @@ To run this script, use the following command from the project root:
 """
 
 ## IMPORTS ##
-import re
 import json
 from pathlib import Path
 
@@ -43,7 +42,6 @@ OUTPUT_RESULTS = Path(".") / "Output/" / "Screengetter"
 # Directories - logs
 OUTPUT_DIR_LOGS = Path(".") / "Pipelines" / "Screengetter" / "Logs"
 OUTPUT_DIR_LOG_FULL_PIPELINE = OUTPUT_DIR_LOGS / "full_pipeline.log"
-OUTPUT_DIR_LOG_1 = OUTPUT_DIR_LOGS / "example_1.log"
 
 # Resources
 VIDEO_RESOLUTIONS = OUTPUT_REFERENCE / "resolutions.json"
@@ -145,7 +143,6 @@ def main() -> None:
     logger.info(f"Processed events saved to {OUTPUT_FRAMEARRAYS}")
 
     analyze_frames(
-        OUTPUT_FRAMEARRAYS,
         output_path_meta,
         OUTPUT_RESULTS
     )

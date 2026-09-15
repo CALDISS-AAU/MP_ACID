@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 ## HELPER FUNCTIONS ##
 @lru_cache(maxsize=1)
 def _load_model():
-    # Load weights only when a comparison is needed.
+    """Load LPIPS model. Imports are part of the function to only load when comparison is needed."""
     import lpips
     import torch
 
@@ -34,12 +34,24 @@ def _prepare_frame(frame: np.ndarray) -> np.ndarray:
 def frame_distance(
     frame: np.ndarray,
     reference_frame: np.ndarray
-):
+)-> float:
     """Return LPIPS distance.
 
     Inputs are uint8 BGR frames. Comparisons use the full image resized to 224x224.
     Higher thresholds reject more frames. Pretrained AlexNet weights download
     on first comparison unless cached locally; the model is reused thereafter.
+
+    Parameters
+    ----------
+    frame:
+        Frame as np.array to compare.
+
+    reference_frame:
+        Reference frame as np.array to compare.
+
+    Returns
+    -------
+    float of LPIPS distance between frame and reference_frame.
     """
 
     import torch
@@ -65,6 +77,21 @@ def frames_are_not_similar(
     Inputs are uint8 BGR frames. Comparisons use the full image resized to 224x224.
     Higher thresholds reject more frames. Pretrained AlexNet weights download
     on first comparison unless cached locally; the model is reused thereafter.
+
+    Parameters
+    ----------
+    frame:
+        Frame as np.array to compare.
+
+    reference_frame:
+        Reference frame as np.array to compare.
+
+    similarity_threshold:
+        LPIPS distance threshold to use to determine whether frames are not similar.
+
+    Returns
+    -------
+    bool of whether frames are not similar (True: Not similar)
     """
 
     distance = frame_distance(frame, reference_frame)
@@ -82,15 +109,48 @@ def frames_are_similar(
     Inputs are uint8 BGR frames. Comparisons use the full image resized to 224x224.
     Higher thresholds reject more frames. Pretrained AlexNet weights download
     on first comparison unless cached locally; the model is reused thereafter.
+
+    Parameters
+    ----------
+    frame:
+        Frame as np.array to compare.
+
+    reference_frame:
+        Reference frame as np.array to compare.
+
+    similarity_threshold:
+        LPIPS distance threshold to use to determine whether frames are similar.
+
+    Returns
+    -------
+    bool of whether frames are similar (True: Similar)
     """
 
     return not frames_are_not_similar(frame, retained_frame, similarity_threshold)
 
 
-def frames_are_similar_pixeldif(frame1, frame2, tolerance_pct = 10):
-    """Determine whether two frames are near identical based on tolerance_pct (% pixels allowed to deviate)"""
+def frames_are_similar_pixeldif(frame, reference_frame, tolerance_pct = 10):
+    """
+    Determine whether two frames are near identical based on tolerance_pct (% pixels allowed to deviate)
+
+    Parameters
+    ----------
+    frame:
+        Frame as np.array to compare.
+
+    reference_frame:
+        Reference frame as np.array to compare.
+
+    tolerance_pct:
+        Tolerance level in percentage on how much pixels are allowed to differ between frames to be considered similar.
+
+    Returns
+    -------
+    bool of whether frames are similar (True: Similar)
     
-    pixels_differ = np.any(frame1 != frame2, axis=2)
+    """
+    
+    pixels_differ = np.any(frame != reference_frame, axis=2)
 
     diff_pct = pixels_differ.mean() * 100
 

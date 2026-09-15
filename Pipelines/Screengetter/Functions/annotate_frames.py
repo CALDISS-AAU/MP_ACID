@@ -95,6 +95,27 @@ def annotate_frames_in_intervals(
     """
     Annotate frames using reference set. Each interval of frame associated with an event is tagged based on LPIPS distance to frame in reference set. 
     If frame differs too much from any frame in the reference set, the frame is tagged as 'unknown'
+
+    Parameters
+    ----------
+    frames_in_intervals:
+        List of lists of frames. Each list corresponds to an interval where the same view of the UI is active with an associated frame (np.array).
+
+    reference_dir:
+        Path to dir where reference set of frames is located.
+
+    reference_set:
+        Path to JSON with annotated reference frames.
+
+    acceptance_threshold:
+        LPIPS distance threshold to use to accept whether frame matches frame from reference set (default: 0.5)
+
+    use_resolution:
+        Dictionary of resolution to standardize frames to (width, height)
+
+    Returns
+    -------
+    List of lists of frames with annotations/tags.
     """
 
     frames_annotated = []

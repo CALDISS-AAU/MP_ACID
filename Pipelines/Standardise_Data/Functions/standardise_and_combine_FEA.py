@@ -76,7 +76,7 @@ def _reduce_to_tasks(
         "Reduced dataframe from %d to %d rows by retaining "
         "Affectiva measurements",
         original_row_count,
-        df_feelings.height,
+        df_tasks.height,
     )
 
     return df_tasks

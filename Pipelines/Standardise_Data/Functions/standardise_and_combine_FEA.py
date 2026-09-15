@@ -1,4 +1,4 @@
-"""Helper functions related to FEA in the Standardise_Data pipeline."""
+"""Standardise and combine facial-expression analysis data."""
 
 ## IMPORTS ##
 import logging
@@ -12,7 +12,7 @@ def _extract_group(
     input_file: Path,
     logger: logging.Logger,
 ) -> str:
-    """Extract the participant/group ID from the iMotions metadata."""
+    """Extract the group identifier from the iMotions metadata."""
 
     with input_file.open("r", encoding="utf-8") as f:
         for line in f:
@@ -33,7 +33,7 @@ def _reduce_to_tasks(
     df: pl.DataFrame,
     logger: logging.Logger,
 ) -> pl.DataFrame:
-    """Keep rows between StartMedia and EndMedia, inclusive."""
+    """Retain rows from each StartMedia event through its EndMedia event."""
 
     original_row_count = df.height
     kept_rows = []
@@ -73,9 +73,10 @@ def _reduce_to_tasks(
     )
 
     logger.info(
-        "Reduced dataframe from %d to %d rows by retaining task intervals",
+        "Reduced dataframe from %d to %d rows by retaining "
+        "Affectiva measurements",
         original_row_count,
-        df_tasks.height,
+        df_feelings.height,
     )
 
     return df_tasks
@@ -84,7 +85,7 @@ def _reduce_to_feelings(
     df: pl.DataFrame,
     logger: logging.Logger,
 ) -> pl.DataFrame:
-    """Keep only rows containing Affectiva facial-expression measurements."""
+    """Retain only Affectiva facial-expression measurement rows."""
 
     original_row_count = df.height
 
@@ -118,7 +119,9 @@ def _remove_irrelevant_rows(
     df: pl.DataFrame,
     logger: logging.Logger,
 ) -> pl.DataFrame:
-    """Remove rows that are irrelevant for downstream analysis."""
+    """Retain task intervals ->
+       Retain Affectiva facial-expression measurements
+    """
 
     logger.info("Removing rows outside task intervals")
     df = _reduce_to_tasks(df, logger)
@@ -137,7 +140,7 @@ def _add_task_id(
     df: pl.DataFrame,
     logger: logging.Logger,
 ) -> pl.DataFrame:
-    """Extract the task ID from the SourceStimuliName column."""
+    """Extract task identifiers from the SourceStimuliName column."""
 
     df = df.with_columns(
         pl.col("SourceStimuliName")
@@ -153,7 +156,7 @@ def _reset_time(
     df: pl.DataFrame,
     logger: logging.Logger,
 ) -> pl.DataFrame:
-    """Reset the timestamp so each task starts at 0 ms."""
+    """Reset timestamps so that each task begins at zero milliseconds."""
 
     # Log the original task intervals
     task_intervals = (
@@ -206,7 +209,7 @@ def _remove_irrelevant_cols(
     feeling_cols: list,
     logger: logging.Logger,
 ) -> pl.DataFrame:
-    """Keep only columns required for downstream event analysis."""
+    """Retain only the columns required for facial-expression analysis."""
 
     relevant_cols = [
         "Row",
@@ -275,9 +278,13 @@ def standardise_and_combine_fea(
     feeling_cols: list,
     logger: logging.Logger,
 ) -> None:
-    """Removes metadata. \
-        Adds group and task ids to individual datasets \
-        Combines all datasets"""
+    """Remove metadata from each FEA dataset ->
+       Add group and task IDs ->
+       Retain task-related facial-expression measurements ->
+       Reset timestamps for individual tasks ->
+       Combine datasets and retain relevant columns ->
+       Convert feeling scores to binary values
+    """
     logger.info("="*40)
     logger.info("Initiate mission: Combine all FEA datasets into one")
     logger.info("="*40)
@@ -290,9 +297,16 @@ def standardise_and_combine_fea(
     for file in Path(input_folder).glob("*.csv"):
         group_id = _extract_group(file, logger)
         df = pl.read_csv(file, skip_rows=24, infer_schema_length=None)
-        logger.info(f"Read {file} into a new dataframe and skipping the metadata")
+        logger.info(
+            "Read %s into a new dataframe and skipping the metadata",
+            file,
+        )
         logger.info("-"*20)
-        logger.info(f"Adding group id ({group_id}) to {file}")
+        logger.info(
+            "Adding group id (%s) to %s",
+            group_id,
+            file,
+        )
         df = df.with_columns(
             pl.lit(group_id).alias("group"),
         )
@@ -330,5 +344,8 @@ def standardise_and_combine_fea(
     df_combined.write_csv(output_dir)
 
     logger.info("-"*40)
-    logger.info("All FEA datasets have been combined into one with the group and task ids as columns")
+    logger.info(
+        "All FEA datasets have been combined into one with the group "
+        "and task ids as columns"
+    )
     logger.info("="*20)

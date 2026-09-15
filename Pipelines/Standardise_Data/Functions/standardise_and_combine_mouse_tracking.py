@@ -1,4 +1,4 @@
-"""Helper functions related to mouse tracking in the Standardise_Data pipeline."""
+"""Standardise and combine mouse-tracking data for downstream analysis."""
 
 ## IMPORTS ##
 import logging
@@ -12,7 +12,7 @@ def _extract_group(
     input_file: Path,
     logger: logging.Logger,
 ) -> str:
-    """Extract the participant/group ID from the iMotions metadata."""
+    """Extract the group identifier from the iMotions metadata."""
 
     with input_file.open("r", encoding="utf-8") as f:
         for line in f:
@@ -33,7 +33,7 @@ def _reduce_to_tasks(
     df: pl.DataFrame,
     logger: logging.Logger,
 ) -> pl.DataFrame:
-    """Keep rows between StartMedia and EndMedia, inclusive."""
+    """Retain rows from each StartMedia event through its EndMedia event."""
 
     original_row_count = df.height
     kept_rows = []
@@ -84,7 +84,7 @@ def _add_task_id(
     df: pl.DataFrame,
     logger: logging.Logger,
 ) -> pl.DataFrame:
-    """Extract the task ID from the SourceStimuliName column."""
+    """Extract task identifiers from the SourceStimuliName column."""
 
     df = df.with_columns(
         pl.col("SourceStimuliName")
@@ -100,7 +100,7 @@ def _reset_time(
     df: pl.DataFrame,
     logger: logging.Logger,
 ) -> pl.DataFrame:
-    """Reset the timestamp so each task starts at 0 ms."""
+    """Reset timestamps so that each task begins at zero milliseconds."""
 
     # Log the original task intervals
     task_intervals = (
@@ -152,7 +152,7 @@ def _remove_irrelevant_cols(
     df: pl.DataFrame,
     logger: logging.Logger,
 ) -> pl.DataFrame:
-    """Keep only columns required for downstream event analysis."""
+    """Retain only the columns required for mouse-tracking analysis."""
 
     relevant_cols = [
         "Row",
@@ -191,11 +191,15 @@ def standardise_and_combine_mouse_tracking(
     output_dir: str,
     logger: logging.Logger,
 ) -> None:
-    """Removes metadata. \
-        Adds group and task ids to individual datasets \
-        Combines all datasets"""
+    """Removes metadata ->
+       Adds group and task ids to individual datasets ->
+       Resets timestamps for individual tasks ->
+       Combines all datasets
+    """
     logger.info("="*40)
-    logger.info("Initiate mission: Combine all mouse tracking datasets into one")
+    logger.info(
+        "Initiate mission: Combine all mouse tracking datasets into one"
+    )
     logger.info("="*40)
 
     list_of_dfs = []
@@ -206,9 +210,16 @@ def standardise_and_combine_mouse_tracking(
     for file in Path(input_folder).glob("*.csv"):
         group_id = _extract_group(file, logger)
         df = pl.read_csv(file, skip_rows=22)
-        logger.info(f"Read {file} into a new dataframe and skipping the metadata")
+        logger.info(
+            "Read %s into a new dataframe and skipping the metadata",
+            file,
+        )
         logger.info("-"*20)
-        logger.info(f"Adding group id ({group_id}) to {file}")
+        logger.info(
+            "Adding group id (%s) to %s",
+            group_id,
+            file,
+        )
         df = df.with_columns(
             pl.lit(group_id).alias("group"),
         )
@@ -230,11 +241,14 @@ def standardise_and_combine_mouse_tracking(
     df_combined = pl.concat(list_of_dfs)
     logger.info("-"*20)
     logger.info("Removing irrelevant cols")
-    df_combined = _remove_irrelevant_cols(df, logger)
+    df_combined = _remove_irrelevant_cols(df_combined, logger)
     df_combined.write_csv(output_dir)
 
     logger.info("-"*40)
-    logger.info("All mouse tracking datasets have been combined into one with the group and task ids as columns")
+    logger.info(
+        "All mouse tracking datasets have been combined into one with "
+        "the group and task ids as columns"
+    )
     logger.info("="*20)
 
     

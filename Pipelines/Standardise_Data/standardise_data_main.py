@@ -15,9 +15,10 @@ from .Functions.standardise_and_combine_FEA import standardise_and_combine_fea
 
 ## STATIC VARIABLES ##
 # Directories - input
-INPUT_DIR_TRANSCRIPTIONS_FOLDER = "/work/MP_ACID/Data/raw/iMotions/Audio_PRIMO_resp_transcribed/csv"
-INPUT_DIR_MOUSE_TRACKING_FOLDER = "/work/MP_ACID/Data/raw/iMotions/MouseData"
-INPUT_DIR_FEA_FOLDER = "/work/MP_ACID/Data/raw/iMotions/FEA/DDD-F2026-RespCam-FEA_PRIMO"
+INPUT_DIR_BASE = "/work/MP_ACID/Data/raw/iMotions"
+INPUT_DIR_TRANSCRIPTIONS_FOLDER = f"{INPUT_DIR_BASE}/Audio_PRIMO_resp_transcribed/csv"
+INPUT_DIR_MOUSE_TRACKING_FOLDER = f"{INPUT_DIR_BASE}/MouseData"
+INPUT_DIR_FEA_FOLDER = f"{INPUT_DIR_BASE}/FEA/DDD-F2026-RespCam-FEA_PRIMO"
 
 # Directories - internal output
 # OUTPUT_DIR_AAA = "Pipelines/Standardise_Data/Data/xxx.zzz"

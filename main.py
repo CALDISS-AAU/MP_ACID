@@ -10,12 +10,12 @@
 """
 ## IMPORTS ##
 # Pipeline mains
-from Pipelines.Example_Pipeline.example_pipeline_main import main as example_pipeline_main
+from Pipelines.Screengetter.screengetter_main import main as screengetter
 ## _______ ##
 
 ## MAIN FUNCTION ##
 def main() -> None:
-    example_pipeline_main()
+    screengetter()
 ## _____________ ##
 
 ## CALL OF MAIN FUNCTION ##

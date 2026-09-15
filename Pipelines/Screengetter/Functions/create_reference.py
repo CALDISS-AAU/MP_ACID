@@ -1,7 +1,7 @@
 """Create reference PNGs and frame arrays from a directory of videos."""
 
 ## IMPORTS ##
-from collections.abc import Iterable, Tuple
+from collections.abc import Iterable
 import json
 from math import isfinite, inf
 from pathlib import Path
@@ -100,7 +100,7 @@ def create_reference(
     *,
     similarity_threshold: float = 0.5,
     seed_use = None
-) -> Tuple[list[dict], dict]:
+) -> tuple[list[dict], dict]:
     """
     Save reference frames sampled every five seconds from each video of a sample of videos.
 

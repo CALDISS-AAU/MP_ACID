@@ -5,7 +5,6 @@ To run this script, use the following command from the project root:
 """
 
 ## IMPORTS ##
-from collections.abc import Tuple
 from pathlib import Path
 import logging
 
@@ -79,7 +78,7 @@ def process_event_data(
     screenrecs_dir: Path,
     reference_dir: Path, 
     reference_set: Path
-    ) -> Tuple[list[dict], int]:
+    ) -> tuple[list[dict], int]:
     """
     Processes event data from Data_Combination pipeline. For each event timestamp, 1 frame per second is extracted in the 5 seconds leading up to the event (context settings not currently exposed at higher level function).
     Frames are tagged based on UI location using an annotated reference set.

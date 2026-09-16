@@ -107,12 +107,12 @@ def process_event_data(
 
     """
 
-    group_tasks = dict(events_df.select("group", "task").iter_rows())
+    group_tasks = list(events_df.select("group", "task").unique().iter_rows())
     
     processed_events = []
     events_failed = 0
 
-    for group, task in group_tasks.items():
+    for group, task in group_tasks:
 
         logger.info(f"Processing events for {group}-{task}")
 

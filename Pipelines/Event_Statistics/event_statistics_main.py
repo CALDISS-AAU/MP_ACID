@@ -25,12 +25,12 @@ INPUT_DIR_MANUAL_REGISTRATIONS = (
 # OUTPUT_DIR_AAA = "Pipelines/Event_Statistics/Data/xxx.zzz"
 
 # Directories - global output
-OUTPUT_DIR_BASE = "."
+OUTPUT_DIR_BASE = "./Output"
 OUTPUT_PATH_STATISTICS_FOLDER = (
-    f"{OUTPUT_DIR_BASE}/Data/Event_Statistics"
+    f"{OUTPUT_DIR_BASE}/Event_Statistics"
 )
 OUTPUT_DIR_FEELING_EVENT_CONFIRMATION = (
-    f"{OUTPUT_DIR_BASE}/Data/Event_Statistics"
+    f"{OUTPUT_DIR_BASE}/Event_Statistics"
 )
 
 # Directories - logs

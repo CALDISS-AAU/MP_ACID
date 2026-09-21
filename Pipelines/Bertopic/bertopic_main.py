@@ -17,8 +17,8 @@ INPUT_BASE = "."
 INPUT_DIR_DATA = f"{INPUT_BASE}/Data/Data_Combination/combined_data_when_feelings_pc85_pre0_post0.json"
 
 # Directories - internal output
-OUTPUT_DIR_TRAINED_MODEL_BASE = "Pipelines/Bertopic/Data/trained_model"
-OUTPUT_DIR_VISUALISATIONS_BASE = "Pipelines/Bertopic/Data/visualisations"
+OUTPUT_DIR_TRAINED_MODEL_BASE = "./Output/Bertopic/trained_model"
+OUTPUT_DIR_VISUALISATIONS_BASE = "./Output/Bertopic/visualisations"
 
 # Directories - global output
 OUTPUT_BASE = "."

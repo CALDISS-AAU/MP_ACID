@@ -131,6 +131,11 @@ def train_model(
         save_embedding_model=embedding_model,
     )
 
+    doc_topics = topic_model.get_document_info(texts)
+
+    doc_topic_outpath = Path(output_dir_model) / "document_to_topic.csv"
+    doc_topics.to_csv(doc_topic_outpath, index=False)
+
     visualisation_directory = Path(
         output_dir_visualisations
     )

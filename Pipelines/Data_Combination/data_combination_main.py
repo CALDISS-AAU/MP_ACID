@@ -22,7 +22,7 @@ INPUT_DIR_MOUSE_DATA = f"{INPUT_DIR_BASE}/Data/Standardise_Data/mouse_tracking.c
 # OUTPUT_DIR_AAA = "Pipelines/Data_Combination/Data/xxx.zzz"
 
 # Directories - global output
-OUTPUT_BASE_COMBINED_DATA = "./Data/Data_Combination/combined_data_when_feelings"
+OUTPUT_BASE_COMBINED_DATA = "./Output/Data_Combination/combined_data_when_feelings"
 
 # Directories - logs
 OUTPUT_DIR_LOG_FULL_PIPELINE = "./Pipelines/Data_Combination/Logs/full_pipeline.log"

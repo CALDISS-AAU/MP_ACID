@@ -11,9 +11,9 @@
 ## IMPORTS ##
 # Pipeline mains
 from Pipelines.Standardise_Data.standardise_data_main import main as standardise_data
+from Pipelines.Feelings_Investigation.feelings_investigation_main import main as investigate_feelings
 from Pipelines.Data_Combination.data_combination_main import main as combine_data
 from Pipelines.Screengetter.screengetter_main import main as screengetter
-from Pipelines.Feelings_Investigation.feelings_investigation_main import main as investigate_feelings
 from Pipelines.Bertopic.bertopic_main import main as BERTopic
 from Pipelines.Event_Statistics.event_statistics_main import main as event_statistics
 ## _______ ##
@@ -21,9 +21,9 @@ from Pipelines.Event_Statistics.event_statistics_main import main as event_stati
 ## MAIN FUNCTION ##
 def main() -> None:
     standardise_data()
+    investigate_feelings()
     combine_data()
     screengetter()
-    investigate_feelings()
     BERTopic()
     event_statistics()
     

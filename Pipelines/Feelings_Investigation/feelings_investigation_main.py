@@ -20,8 +20,8 @@ INPUT_DIR_FEA_DATA_FOLDER = f"{INPUT_BASE}/Data/Standardise_Data"
 INPUT_FILE_PATTERN = "FEA_*.csv"
 
 # Directories - internal output
-OUTPUT_DIR_GRAPH_PLOTS_FOLDER = "Pipelines/Feelings_Investigation/Data/Plots/Graphs"
-OUTPUT_DIR_BOX_PLOTS_FOLDER = "Pipelines/Feelings_Investigation/Data/Plots/Box"
+OUTPUT_DIR_GRAPH_PLOTS_FOLDER = "./Output/Feelings_Investigation/Plots/Graphs"
+OUTPUT_DIR_BOX_PLOTS_FOLDER = "./Output/Feelings_Investigation/Plots/Box"
 
 # Directories - global output
 # OUTPUT_DIR_AAA = "./Data/Feelings_Investigation/xxx.zzz"
